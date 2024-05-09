@@ -1,4 +1,5 @@
 ﻿using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -9,31 +10,34 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Voxel {
         int texture;
+        int levels;
         Compute generation;
 
         public Voxel() {
-            int size = 64;
+            int size = 512;
+            levels = Int32.Log2(size) - 2;
             texture = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture3D, texture);
-            GL.TextureStorage3D(texture, 4, SizedInternalFormat.R8ui, size, size, size);
+            GL.TextureStorage3D(texture, levels, SizedInternalFormat.R32ui, size, size, size);
 
             generation = new Compute("Voxel.glsl");
 
             GL.UseProgram(generation.program);
             GL.ActiveTexture(TextureUnit.Texture0);
-            GL.BindImageTexture(0, texture, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R8ui);
-            GL.BindImageTexture(1, texture, 1, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R8ui);
-            GL.BindImageTexture(2, texture, 2, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R8ui);
-            GL.BindImageTexture(3, texture, 3, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R8ui);
+
+            for (int i = 0; i < levels; i++) {
+                GL.BindImageTexture(i, texture, i, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
+            }
+            
             GL.DispatchCompute(size / 4, size / 4, size / 4);
         }
 
         public void Bind(int program) {
             GL.ActiveTexture(TextureUnit.Texture1);
-            GL.BindImageTexture(1, texture, 0, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.R8ui);
-            GL.BindImageTexture(2, texture, 1, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.R8ui);
-            GL.BindImageTexture(3, texture, 2, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.R8ui);
-            GL.BindImageTexture(4, texture, 3, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.R8ui);
+
+            for (int i = 0; i < levels; i++) {
+                GL.BindImageTexture(i+1, texture, i, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.R32ui);
+            }
         }
     }
 }

@@ -8,7 +8,7 @@ namespace Test123Bruh {
             var nativeWindowSettings = new NativeWindowSettings() {
                 ClientSize = (800, 600),
                 WindowState = WindowState.Normal,
-                Flags = ContextFlags.Debug | ContextFlags.ForwardCompatible
+                Flags = ContextFlags.ForwardCompatible
             };
             
 

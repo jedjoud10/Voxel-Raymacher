@@ -5,6 +5,9 @@ using OpenTK.Mathematics;
 using System.Runtime.InteropServices;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using System.Runtime.Serialization;
+using System.Drawing.Imaging;
+using System.IO;
+using PixelFormat = OpenTK.Graphics.OpenGL4.PixelFormat;
 
 namespace Test123Bruh {
     internal class Game : GameWindow {
@@ -16,7 +19,9 @@ namespace Test123Bruh {
         Matrix4 projMatrix;
         Matrix4 viewMatrix;
         Vector2 mousePosTest;
+        int selector;
         bool toggle;
+        int scaleDown = 4;
         Voxel voxel = null;
         double last;
 
@@ -120,11 +125,15 @@ namespace Test123Bruh {
                 WindowState = toggle ? WindowState.Fullscreen : WindowState.Normal;
             }
 
+            // Debugger
+            if (KeyboardState.IsKeyPressed(Keys.F4)) {
+                selector += 1;
+                selector = selector % 7;
+            }
+
             // Create a rotation and position matrix based on current rotation and position
             viewMatrix = Matrix4.CreateFromQuaternion(rotation);
-            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(70.0f), (float)ClientSize.Y / (float)ClientSize.X, 0.1f, 1000.0f);
-
-            int scaleDown = 4;
+            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(70.0f), (float)ClientSize.Y / (float)ClientSize.X, 0.1f, 1000.0f); 
 
             // Bind compute shader and execute it
             GL.UseProgram(compute.program);
@@ -132,6 +141,7 @@ namespace Test123Bruh {
             GL.ProgramUniformMatrix4(compute.program, 2, false, ref viewMatrix);
             GL.ProgramUniformMatrix4(compute.program, 3, false, ref projMatrix);
             GL.ProgramUniform3(compute.program, 4, position);
+            GL.ProgramUniform1(compute.program, 5, selector);
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba8);
             voxel.Bind(compute.program);
@@ -141,6 +151,27 @@ namespace Test123Bruh {
 
             // Copy texture back to main FBO
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+            
+            // Screenshotting
+            if (KeyboardState.IsKeyPressed(Keys.F3)) {
+                string execPath = System.Reflection.Assembly.GetEntryAssembly().Location;
+                execPath = Path.GetDirectoryName(execPath);
+                string dirPath = Path.Combine(execPath, "Screenshots");
+                var time = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss") + ".jpg";
+                Directory.CreateDirectory(dirPath);
+                string ssPath = Path.Combine(dirPath, time);
+
+                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+
+                var bitmap = new System.Drawing.Bitmap(ClientSize.X, ClientSize.Y);
+                var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, ClientSize.X, ClientSize.Y), ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                GL.ReadPixels(0, 0, ClientSize.X, ClientSize.Y, PixelFormat.Rgba, PixelType.UnsignedByte, data.Scan0);
+                bitmap.UnlockBits(data);
+                bitmap.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
+                File.Create(ssPath).Dispose();
+                bitmap.Save(ssPath, ImageFormat.Jpeg);
+            }
+
             SwapBuffers();
         }
     }

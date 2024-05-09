@@ -1,7 +1,7 @@
 ﻿#version 450 core
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
-layout(r32ui, binding = 0) uniform uimage3D voxels[4];
+layout(r32ui, binding = 0) uniform uimage3D voxels[7];
 
 vec3 mod289(vec3 x) {
 	return x - floor(x * (1.0 / 289.0)) * 289.0;
@@ -97,13 +97,16 @@ float snoise(vec3 v)
 
 void main() {
 	vec3 pos = vec3(gl_GlobalInvocationID);
-	float val = snoise(pos * 0.004) * 40 + pos.y;
-	//val = pos.y - 20 - sin(pos.z * 0.01) * 20.0
-	val = pos.y - 20;
+	float val = pos.y - 30;
+	val += snoise(pos * 0.01 * vec3(1, 3, 1)) * 40;
+	val += abs(snoise(pos * 0.1)) * 2.0;
+	val -= pow(abs(snoise(pos * 0.01 * vec3(1, 0, 1))), 4) * 90.0;
+	val -= snoise(pos * 0.1 * vec3(1, 8, 1)) * 1.0;
 	int amogus = 1-clamp(int(round(val)), 0, 1);
-	//imageStore(voxels[0], ivec3(gl_GlobalInvocationID), uvec4(1-amogus));
-	imageAtomicMax(voxels[0], ivec3(gl_GlobalInvocationID), uint(amogus));
-	//imageAtomicMax(voxels[1], ivec3(gl_GlobalInvocationID / 2), uint(amogus));
-	//imageAtomicMax(voxels[2], ivec3(gl_GlobalInvocationID / 4), uint(amogus));
-	//imageAtomicMax(voxels[3], ivec3(gl_GlobalInvocationID / 8), uint(amogus));
+	
+	for (int i = 0; i < 7; i++) {
+		float factorino = pow(2, i);
+		ivec3 dat = ivec3(floor(pos / factorino));
+		imageAtomicMax(voxels[i], dat, uint(amogus));
+	}
 }
