@@ -24,8 +24,17 @@ namespace Test123Bruh {
             GL.AttachShader(program, temp);
             GL.LinkProgram(program);
 
-            Console.WriteLine(GL.GetShaderInfoLog(temp));
-            Console.WriteLine(GL.GetProgramInfoLog(program));
+            string shaderLog = GL.GetShaderInfoLog(temp);
+            string programLog = GL.GetProgramInfoLog(program);
+
+            if (shaderLog != "") {
+                throw new Exception(shaderLog);
+            }
+
+            if (programLog != "") {
+                throw new Exception(programLog);
+            }
+
             GL.ValidateProgram(program);
         }  
     }

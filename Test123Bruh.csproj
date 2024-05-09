@@ -19,4 +19,8 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="Resources\Voxel.glsl" />
+  </ItemGroup>
+
 </Project>
