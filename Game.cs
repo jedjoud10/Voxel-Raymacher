@@ -15,13 +15,14 @@ namespace Test123Bruh {
         int screenTexture;
         Compute compute;
         Quaternion rotation;
-        Vector3 position = new Vector3(0.0f, 2.0f, 0.0f);
+        Vector3 position = new Vector3(0.0f, 20.0f, 0.0f);
         Matrix4 projMatrix;
         Matrix4 viewMatrix;
         Vector2 mousePosTest;
         int selector;
         bool toggle;
-        int scaleDown = 4;
+        int scaleDown = 2;
+        int frameSelector = 0;
         Voxel voxel = null;
         double last;
 
@@ -90,9 +91,11 @@ namespace Test123Bruh {
         protected override void OnUpdateFrame(FrameEventArgs args) {
             base.OnUpdateFrame(args);
 
+            frameSelector += 1;
+
             // Clear background (will get overwritten anyways)
-            GL.ClearColor(Color4.Black);
-            GL.Clear(ClearBufferMask.ColorBufferBit);
+            //GL.ClearColor(Color4.Black);
+            //GL.Clear(ClearBufferMask.ColorBufferBit);
 
             // Update rotation
             CursorState = CursorState.Grabbed;
@@ -122,7 +125,7 @@ namespace Test123Bruh {
             // Fullscreen toggle
             if (KeyboardState.IsKeyPressed(Keys.F5)) {
                 toggle = !toggle;
-                WindowState = toggle ? WindowState.Fullscreen : WindowState.Normal;
+                WindowState = toggle ? WindowState.Maximized : WindowState.Normal;
             }
 
             // Debugger
@@ -142,6 +145,8 @@ namespace Test123Bruh {
             GL.ProgramUniformMatrix4(compute.program, 3, false, ref projMatrix);
             GL.ProgramUniform3(compute.program, 4, position);
             GL.ProgramUniform1(compute.program, 5, selector);
+            GL.ProgramUniform1(compute.program, 6, frameSelector % 2);
+            GL.ProgramUniform1(compute.program, 7, voxel.size);
             GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba8);
             voxel.Bind(compute.program);

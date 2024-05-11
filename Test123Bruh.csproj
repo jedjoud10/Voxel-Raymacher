@@ -21,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Resources\BasicCopy.glsl" />
     <None Remove="Resources\Voxel.glsl" />
   </ItemGroup>
 

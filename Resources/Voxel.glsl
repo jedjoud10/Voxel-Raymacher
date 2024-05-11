@@ -101,6 +101,7 @@ void main() {
 	val += snoise(pos * 0.01 * vec3(1, 3, 1)) * 40;
 	val += abs(snoise(pos * 0.1)) * 2.0;
 	val -= pow(abs(snoise(pos * 0.01 * vec3(1, 0, 1))), 4) * 90.0;
+	val -= pow(abs(snoise(pos * 0.001 * vec3(1, 0, 1))), 4) * 200.0;
 	val -= snoise(pos * 0.1 * vec3(1, 8, 1)) * 1.0;
 	int amogus = 1-clamp(int(round(val)), 0, 1);
 	
