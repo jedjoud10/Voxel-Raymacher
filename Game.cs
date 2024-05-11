@@ -15,7 +15,7 @@ namespace Test123Bruh {
         int screenTexture;
         Compute compute;
         Quaternion rotation;
-        Vector3 position = new Vector3(0.0f, 20.0f, 0.0f);
+        Vector3 position = new Vector3(0.0f, 100.0f, 0.0f);
         Matrix4 projMatrix;
         Matrix4 viewMatrix;
         Vector2 mousePosTest;
@@ -125,7 +125,7 @@ namespace Test123Bruh {
             // Fullscreen toggle
             if (KeyboardState.IsKeyPressed(Keys.F5)) {
                 toggle = !toggle;
-                WindowState = toggle ? WindowState.Maximized : WindowState.Normal;
+                WindowState = toggle ? WindowState.Fullscreen : WindowState.Normal;
             }
 
             // Debugger

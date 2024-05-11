@@ -15,7 +15,7 @@ namespace Test123Bruh {
         Compute generation;
 
         public Voxel() {
-            levels = Int32.Log2(size) - 2;
+            levels = Int32.Log2(size);
             texture = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture3D, texture);
             GL.TextureStorage3D(texture, levels, SizedInternalFormat.R32ui, size, size, size);

@@ -50,6 +50,7 @@ vec2 intersection(vec3 dir, vec3 smol, vec3 beig) {
 }
 
 void main() {
+	// checkerboard rendering
 	if ((mod(gl_GlobalInvocationID.x, 2) == 1 ^^ mod(gl_GlobalInvocationID.y, 2) == 0) ^^ (frame_selector == 0)) {
 		return;
 	}
@@ -67,33 +68,60 @@ void main() {
 	vec3 pos = position;
 	vec3 color = vec3(-1.0);
 
-	vec2 distances = intersection(ray_dir, vec3(-1), vec3(1));
-	float t = distances.y - distances.x;
-	 
-	/*
-	if (t > 0.0) {
-		color = vec3(distances.x * ray_dir + t * ray_dir);
-	}
-	*/
+	// debug stuff to view mip map iterations
+	float total_iterations = 0.0;
+	float total_mip_map_iterations = 0.0;
 
-	for (int i = 0; i < 128; i++) {
-		vec2 distances = intersection(ray_dir, floor(pos), floor(pos) + vec3(1));
-		float t = distances.y - distances.x;
-		pos += ray_dir * (0.001 + t);
+	for (int i = 0; i < 64; i++) {
+		total_iterations += 1;
+		float voxel_distance = 0.0;
 
-		vec3 grid_point = floor(mod(vec3(pos), vec3(map_size, 100000, map_size)));
-		uint v0 = imageLoad(voxels[0], ivec3(grid_point)).x;
+		// recursively iterate through the mip maps (starting at the highest level)
+		// check each level for big empty spaces that we can skip over
+		for (int j = selector; j >= 0; j--) {
+			// use the mip maps themselves as an acceleration structure
+			float scale_factor = pow(2, j);
+			vec3 grid_level_point = floor(pos / scale_factor) * scale_factor;
+
+			// calcualte temporary distance ot the end of the current cell for the current mipmap
+			vec2 distances = intersection(ray_dir, grid_level_point, grid_level_point + vec3(scale_factor));
+			float t_voxel_distance = distances.y - distances.x;
+
+			// modulo scale for repeating the maps
+			vec3 modulo_scale = vec3(map_size / scale_factor, 100000, map_size / scale_factor);
+			ivec3 tex_point = ivec3(floor(mod(pos / scale_factor, modulo_scale)));
+			
+			total_mip_map_iterations += 1;
+			if (imageLoad(voxels[j], tex_point).x == 0) {
+				voxel_distance = t_voxel_distance;
+				break;
+			}
+		}
+
+		// gotta add a small offset since we'd be on the very face of the voxel
+		pos += ray_dir * (0.001 + voxel_distance);
 		
-		if (v0 == 0) {
-			vec3 normal = (floor(pos) - pos + 0.5) / 0.5;
-			color = normal;
+		// lel
+		if (voxel_distance == 0) {
+			vec3 normal = -(floor(pos) - pos + 0.5) / 0.5;
+
+			ivec3 tex_point = ivec3(floor(mod(pos, vec3(map_size, 100000, map_size))));
+			if (imageLoad(voxels[0], tex_point + ivec3(0, 1, 0)).x == 0 && normal.y > 0.707) {
+				color = vec3(1);
+			}
+
 			break;
 		}
 	}
 
+	/*
 	if (all(color == vec3(-1))) {
 		color = ray_dir;
 	}
+	*/
+
+	//color = vec3(total_iterations / 64.0);
+	//color = vec3(total_mip_map_iterations / (64.0 * selector));
 	
 	// store the value in the image that we will blit
 	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 0));

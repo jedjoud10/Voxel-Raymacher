@@ -97,6 +97,7 @@ float snoise(vec3 v)
 
 void main() {
 	vec3 pos = vec3(gl_GlobalInvocationID);
+	pos *= vec3(1, 1, 1);
 	float val = pos.y - 30;
 	val += snoise(pos * 0.01 * vec3(1, 3, 1)) * 40;
 	val += abs(snoise(pos * 0.1)) * 2.0;
