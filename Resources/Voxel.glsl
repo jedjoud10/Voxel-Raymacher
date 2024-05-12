@@ -1,4 +1,7 @@
-﻿#version 450 core
+﻿#version 460 core
+//#extension GL_NV_gpu_shader5 : require
+//#extension GL_ARB_gpu_shader_int64 : require
+//#extension GL_NV_shader_atomic_int64 : require
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 layout(r32ui, binding = 0) uniform uimage3D voxels[7];
@@ -107,6 +110,6 @@ void main() {
 	for (int i = 0; i < 7; i++) {
 		float factorino = pow(2, i);
 		ivec3 dat = ivec3(floor(pos / factorino));
-		imageAtomicMax(voxels[i], dat, uint(amogus));
+		imageAtomicMax(voxels[i], dat, amogus);
 	}
 }
