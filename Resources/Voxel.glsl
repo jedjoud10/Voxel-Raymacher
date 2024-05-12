@@ -97,13 +97,11 @@ float snoise(vec3 v)
 
 void main() {
 	vec3 pos = vec3(gl_GlobalInvocationID);
-	pos *= vec3(1, 1, 1);
 	float val = pos.y - 30;
-	val += snoise(pos * 0.01 * vec3(1, 3, 1)) * 40;
-	val += abs(snoise(pos * 0.1)) * 2.0;
-	val -= pow(abs(snoise(pos * 0.01 * vec3(1, 0, 1))), 4) * 90.0;
-	val -= pow(abs(snoise(pos * 0.001 * vec3(1, 0, 1))), 4) * 200.0;
-	val -= snoise(pos * 0.1 * vec3(1, 8, 1)) * 1.0;
+	val += snoise(pos * 0.01 * vec3(1, 2, 1)) * 20;
+	val -= (1-abs(snoise(pos * 0.05))) * 3;
+	val += (1 - abs(snoise(pos * 0.02 * vec3(1, 0, 1)))) * 60 * clamp(snoise(pos * 0.001), 0, 1);
+	val = min(val, pos.y - 29);
 	int amogus = 1-clamp(int(round(val)), 0, 1);
 	
 	for (int i = 0; i < 7; i++) {

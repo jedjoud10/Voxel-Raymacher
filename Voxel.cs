@@ -11,11 +11,11 @@ namespace Test123Bruh {
     internal class Voxel {
         int texture;
         int levels;
-        public int size = 128;
+        public int size = 256;
         Compute generation;
 
         public Voxel() {
-            levels = Int32.Log2(size);
+            levels = Math.Min(Int32.Log2(size), 7);
             texture = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture3D, texture);
             GL.TextureStorage3D(texture, levels, SizedInternalFormat.R32ui, size, size, size);

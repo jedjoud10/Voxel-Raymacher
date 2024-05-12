@@ -101,14 +101,12 @@ void main() {
 			affect = vec3(0.3);
 		}
 
-		vec3 c = vec3(80, 80, 0);
-		float r = length(pos - c);
-		if (r < 50.0) {
-			ray_dir += ((normalize(pos - c)) / (pow(r, 3) * 0.04));
-			ray_dir = normalize(ray_dir);
-			//return;
-			//f = 0.3;
-		}
+vec3 c = vec3(80, 80, 0);
+float r = length(pos - c);
+if (r < 50.0) {
+	ray_dir += ((normalize(pos - c)) / (pow(r, 3) * 0.04));
+	ray_dir = normalize(ray_dir);
+}
 
 	*/
 

@@ -23,6 +23,8 @@ namespace Test123Bruh {
         bool toggle;
         int scaleDown = 2;
         int frameSelector = 0;
+        int debugSelector;
+        int maxIterations;
         Voxel voxel = null;
         double last;
 
@@ -101,7 +103,6 @@ namespace Test123Bruh {
             CursorState = CursorState.Grabbed;
             mousePosTest += MouseState.Delta * 0.0006f;
             rotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
-            //rotation = Quaternion.FromEulerAngles(-mousePosTest.Y, -mousePosTest.X, 0.0f);
 
             Vector3 forward = Vector3.Transform(-Vector3.UnitZ, rotation);
             Vector3 up = Vector3.Transform(Vector3.UnitY, rotation);
@@ -128,10 +129,20 @@ namespace Test123Bruh {
                 WindowState = toggle ? WindowState.Fullscreen : WindowState.Normal;
             }
 
-            // Debugger
+            // Octree depth selector
             if (KeyboardState.IsKeyPressed(Keys.F4)) {
                 selector += 1;
                 selector = selector % 7;
+            }
+
+            if (KeyboardState.IsKeyPressed(Keys.F2)) {
+                debugSelector += 1;
+                debugSelector = debugSelector % 4;
+            }
+
+            if (KeyboardState.IsKeyPressed(Keys.F1)) {
+                maxIterations += 1;
+                maxIterations = maxIterations % 5;
             }
 
             // Create a rotation and position matrix based on current rotation and position
@@ -147,8 +158,10 @@ namespace Test123Bruh {
             GL.ProgramUniform1(compute.program, 5, selector);
             GL.ProgramUniform1(compute.program, 6, frameSelector % 2);
             GL.ProgramUniform1(compute.program, 7, voxel.size);
+            GL.ProgramUniform1(compute.program, 8, debugSelector);
+            GL.ProgramUniform1(compute.program, 9, 32 << maxIterations);
             GL.ActiveTexture(TextureUnit.Texture0);
-            GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rgba8);
+            GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             voxel.Bind(compute.program);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
