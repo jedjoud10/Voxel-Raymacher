@@ -18,7 +18,7 @@ namespace Test123Bruh {
             levels = Math.Min(Int32.Log2(size), 7);
             texture = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture3D, texture);
-            GL.TextureStorage3D(texture, levels, SizedInternalFormat.Rg32ui, size, size, size);
+            GL.TextureStorage3D(texture, levels, SizedInternalFormat.R32ui, size, size, size);
 
             generation = new Compute("Voxel.glsl");
 
@@ -26,7 +26,7 @@ namespace Test123Bruh {
             GL.ActiveTexture(TextureUnit.Texture0);
 
             for (int i = 0; i < levels; i++) {
-                GL.BindImageTexture(i, texture, i, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.Rg32ui);
+                GL.BindImageTexture(i, texture, i, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32ui);
             }
             
             GL.DispatchCompute(size / 4, size / 4, size / 4);
@@ -36,7 +36,7 @@ namespace Test123Bruh {
             GL.ActiveTexture(TextureUnit.Texture1);
 
             for (int i = 0; i < levels; i++) {
-                GL.BindImageTexture(i+1, texture, i, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.Rg32ui);
+                GL.BindImageTexture(i+1, texture, i, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.R32ui);
                 
             }
         }

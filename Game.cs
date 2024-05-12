@@ -15,16 +15,16 @@ namespace Test123Bruh {
         int screenTexture;
         Compute compute;
         Quaternion rotation;
-        Vector3 position = new Vector3(0.0f, 100.0f, 0.0f);
+        Vector3 position = new Vector3(64.0f, 50.0f, 64.0f);
         Matrix4 projMatrix;
         Matrix4 viewMatrix;
         Vector2 mousePosTest;
-        int selector;
+        int selector = 6;
         bool toggle;
         int scaleDown = 2;
         int frameSelector = 0;
-        int debugSelector;
-        int maxIterations;
+        int debugSelector = 0;
+        int maxIterations = 2;
         Voxel voxel = null;
         double last;
 
