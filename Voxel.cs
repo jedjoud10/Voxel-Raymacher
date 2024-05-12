@@ -11,7 +11,7 @@ namespace Test123Bruh {
     internal class Voxel {
         int texture;
         int levels;
-        public int size = 256;
+        public int size = 128;
         Compute generation;
 
         public Voxel() {

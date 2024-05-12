@@ -11,7 +11,6 @@ layout(location = 6) uniform int frame_selector;
 layout(location = 7) uniform int map_size;
 layout(location = 8) uniform int debug_selector;
 layout(location = 9) uniform int max_iters;
-//shared vec3 shared_pos[32][32];
 
 vec3 hash32(vec2 p)
 {
@@ -62,6 +61,25 @@ vec2 intersection(vec3 pos, vec3 dir, vec3 smol, vec3 beig) {
 	*/
 
 	return vec2(tmin, tmax);
+}
+
+// simple lighting calculation for the sky background
+vec3 sky(vec3 normal) {
+	// Get up component of vector and remap to 0 - 1 range
+	float up = normal.y * 0.5 + 0.5;
+
+	// Define color mapping values
+	const vec3 dark_blue = pow(vec3(0.137, 0.263, 0.463) * 0.5, vec3(2.2));
+	const vec3 light_blue = pow(vec3(0.533, 0.733, 0.857), vec3(2.2));
+	const vec3 orange = pow(vec3(247.0, 134.0, 64.0) / 255.0, vec3(2.2));
+
+	// Do some color mapping (day color)
+	vec3 day_color = mix(light_blue, dark_blue, max(up, 0.0));
+
+	// Do some color mapping (sunset color)
+	vec3 sunset_color = mix(orange, light_blue, max(up, 0.2));
+
+	return sunset_color;
 }
 
 // recrusviely go through the mip chain
@@ -119,25 +137,15 @@ vec3 lighting(vec3 pos, vec3 normal) {
 	vec3 internal = floor(pos * 8.0) / 8.0;
 	vec3 color = vec3(1);
 
-	//uvec2 test_id = gl_LocalInvocationID.xy;
-	//shared_pos[test_id.x][test_id.y] = pos;
-
-	//memoryBarrierShared();
-	//groupMemoryBarrier();
-	//barrier();
-
-	//vec3 derFdX = shared_pos[test_id.x + 1][test_id.y + 0] - shared_pos[test_id.x + 0][test_id.y + 0];
-	//vec3 derFdY = shared_pos[test_id.x + 0][test_id.y + 1] - shared_pos[test_id.x + 0][test_id.y + 0];
-	
 	// check if the texel above us is empty
 	ivec3 tex_point = ivec3(floor(mod(pos, vec3(map_size, 100000, map_size))));
-	if (imageLoad(voxels[0], tex_point + ivec3(0, 1, 0)).x == 0 && normal.y > 0.900f) {
+	if (imageLoad(voxels[0], tex_point + ivec3(0, 1, 0)).x == 0 && normal.y > 0.800f) {
 		color = vec3(17, 99, 0);
 	}
 	else {
 		color = vec3(48, 36, 0);
 	}
-
+	
 	/*
 	vec3 last = pos;
 	if (shadow(pos, last)) {
@@ -146,26 +154,11 @@ vec3 lighting(vec3 pos, vec3 normal) {
 	*/
 
 	float randomized = clamp(10.0 / distance(pos, position), 0.0, 0.6);
-	return color * (hash13(internal * 2.43531f) * randomized + (1 - randomized)) / 255.0;
-}
+	vec3 diffuse = color * (hash13(internal * 2.43531f) * randomized + (1 - randomized)) / 255.0;
 
-// simple lighting calculation for the sky background
-vec3 sky(vec3 normal) {
-	// Get up component of vector and remap to 0 - 1 range
-	float up = normal.y * 0.5 + 0.5;
+	vec3 ambient = sky(normalize(normal));
 
-	// Define color mapping values
-	const vec3 dark_blue = pow(vec3(0.137,0.263,0.463) * 0.5, vec3(2.2));
-	const vec3 light_blue = pow(vec3(0.533,0.733,0.857), vec3(2.2));
-	const vec3 orange = pow(vec3(247.0, 134.0, 64.0) / 255.0, vec3(2.2));
-
-	// Do some color mapping (day color)
-	vec3 day_color = mix(light_blue, dark_blue, max(up, 0.0));
-
-	// Do some color mapping (sunset color)
-	vec3 sunset_color = mix(orange, light_blue, max(up, 0.2));
-
-	return sunset_color;
+	return diffuse * 1.3;
 }
 
 void main() {
@@ -223,9 +216,15 @@ void main() {
 		}
 	}
 
+	// ACTUAL GAME VIEW
 	if (debug_selector == 0) {
 		color = act_color;
+	
+		if (!hit) {
+			color = sky(ray_dir) * affect;
+		}
 	}
+	
 	else if (debug_selector == 1) {
 		color = normal * affect;
 	}
@@ -238,9 +237,7 @@ void main() {
 		hit = true;
 	}
 
-	if (!hit) {
-		color = sky(ray_dir) * affect;
-	}
+
 
 	//color = vec3(gl_LocalInvocationID.xy, 0) / vec3(32);
 	// store the value in the image that we will blit

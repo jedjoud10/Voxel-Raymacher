@@ -5,17 +5,79 @@
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 layout(r32ui, binding = 0) uniform uimage3D voxels[7];
+// Modulo 289 without a division (only multiplications)
+float mod289(float x) {
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
 
+// Modulo 7 without a division
+float mod7(float x) {
+	return x - floor(x * (1.0 / 7.0)) * 7.0;
+}
+
+// Permutation polynomial: (34x^2 + 6x) mod 289
+float permute(float x) {
+	return mod289((34.0 * x + 10.0) * x);
+}
+
+float taylorInvSqrt(float r)
+{
+	return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+// Modulo 289 without a division (only multiplications)
+vec2 mod289(vec2 x) {
+	return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+
+// Modulo 7 without a division
+vec2 mod7(vec2 x) {
+	return x - floor(x * (1.0 / 7.0)) * 7.0;
+}
+
+// Permutation polynomial: (34x^2 + 6x) mod 289
+vec2 permute(vec2 x) {
+	return mod289((34.0 * x + 10.0) * x);
+}
+
+vec2 taylorInvSqrt(vec2 r)
+{
+	return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+// Modulo 289 without a division (only multiplications)
 vec3 mod289(vec3 x) {
 	return x - floor(x * (1.0 / 289.0)) * 289.0;
 }
 
+// Modulo 7 without a division
+vec3 mod7(vec3 x) {
+	return x - floor(x * (1.0 / 7.0)) * 7.0;
+}
+
+// Permutation polynomial: (34x^2 + 6x) mod 289
+vec3 permute(vec3 x) {
+	return mod289((34.0 * x + 10.0) * x);
+}
+
+vec3 taylorInvSqrt(vec3 r)
+{
+	return 1.79284291400159 - 0.85373472095314 * r;
+}
+
+// Modulo 289 without a division (only multiplications)
 vec4 mod289(vec4 x) {
 	return x - floor(x * (1.0 / 289.0)) * 289.0;
 }
 
+// Modulo 7 without a division
+vec4 mod7(vec4 x) {
+	return x - floor(x * (1.0 / 7.0)) * 7.0;
+}
+
+// Permutation polynomial: (34x^2 + 6x) mod 289
 vec4 permute(vec4 x) {
-	return mod289(((x * 34.0) + 10.0) * x);
+	return mod289((34.0 * x + 10.0) * x);
 }
 
 vec4 taylorInvSqrt(vec4 r)
@@ -23,6 +85,144 @@ vec4 taylorInvSqrt(vec4 r)
 	return 1.79284291400159 - 0.85373472095314 * r;
 }
 
+/*
+original_author: Patricio Gonzalez Vivo
+description: pass a value and get some random normalize value between 0 and 1
+use: float random[2|3](<float|vec2|vec3> value)
+examples:
+	- /shaders/generative_random.frag
+*/
+
+float random(float x) {
+	return fract(sin(x) * 43758.5453);
+}
+
+float random(vec2 st) {
+	return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float random(vec3 pos) {
+	return fract(sin(dot(pos.xyz, vec3(70.9898, 78.233, 32.4355))) * 43758.5453123);
+}
+
+float random(vec4 pos) {
+	float dot_product = dot(pos, vec4(12.9898, 78.233, 45.164, 94.673));
+	return fract(sin(dot_product) * 43758.5453);
+}
+
+// Hash function from https://www.shadertoy.com/view/4djSRW
+vec3 RANDOM_SCALE3 = vec3(0.1031, 0.1030, 0.0973);
+
+vec4 RANDOM_SCALE4 = vec4(1031, 0.1030, 0.0973, 0.1099);
+
+vec2 random2(float p) {
+	vec3 p3 = fract(vec3(p) * RANDOM_SCALE3);
+	p3 += dot(p3, p3.yzx + 19.19);
+	return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+vec2 random2(vec2 p) {
+	vec3 p3 = fract(p.xyx * RANDOM_SCALE3);
+	p3 += dot(p3, p3.yzx + 19.19);
+	return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+vec2 random2(vec3 p3) {
+	p3 = fract(p3 * RANDOM_SCALE3);
+	p3 += dot(p3, p3.yzx + 19.19);
+	return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+vec3 random3(float p) {
+	vec3 p3 = fract(vec3(p) * RANDOM_SCALE3);
+	p3 += dot(p3, p3.yzx + 19.19);
+	return fract((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+vec3 random3(vec2 p) {
+	vec3 p3 = fract(vec3(p.xyx) * RANDOM_SCALE3);
+	p3 += dot(p3, p3.yxz + 19.19);
+	return fract((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+vec3 random3(vec3 p) {
+	p = fract(p * RANDOM_SCALE3);
+	p += dot(p, p.yxz + 19.19);
+	return fract((p.xxy + p.yzz) * p.zyx);
+}
+
+vec4 random4(float p) {
+	vec4 p4 = fract(vec4(p) * RANDOM_SCALE4);
+	p4 += dot(p4, p4.wzxy + 19.19);
+	return fract((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+vec4 random4(vec2 p) {
+	vec4 p4 = fract(vec4(p.xyxy) * RANDOM_SCALE4);
+	p4 += dot(p4, p4.wzxy + 19.19);
+	return fract((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+vec4 random4(vec3 p) {
+	vec4 p4 = fract(vec4(p.xyzx) * RANDOM_SCALE4);
+	p4 += dot(p4, p4.wzxy + 19.19);
+	return fract((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+vec4 random4(vec4 p4) {
+	p4 = fract(p4 * RANDOM_SCALE4);
+	p4 += dot(p4, p4.wzxy + 19.19);
+	return fract((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+// Cellular noise ("Worley noise") in 2D in GLSL.
+// Copyright (c) Stefan Gustavson 2011-04-19. All rights reserved.
+// This code is released under the conditions of the MIT license.
+// See LICENSE file for details.
+// https://github.com/stegu/webgl-noise
+
+// Cellular noise, returning F1 and F2 in a vec2.
+// Standard 3x3 search window for good F1 and F2 values
+vec2 cellular(vec2 P) {
+#define K 0.142857142857 // 1/7
+#define Ko 0.428571428571 // 3/7
+#define jitter 1.0 // Less gives more regular pattern
+	vec2 Pi = mod289(floor(P));
+	vec2 Pf = fract(P);
+	vec3 oi = vec3(-1.0, 0.0, 1.0);
+	vec3 of = vec3(-0.5, 0.5, 1.5);
+	vec3 px = permute(Pi.x + oi);
+	vec3 p = permute(px.x + Pi.y + oi); // p11, p12, p13
+	vec3 ox = fract(p * K) - Ko;
+	vec3 oy = mod7(floor(p * K)) * K - Ko;
+	vec3 dx = Pf.x + 0.5 + jitter * ox;
+	vec3 dy = Pf.y - of + jitter * oy;
+	vec3 d1 = dx * dx + dy * dy; // d11, d12 and d13, squared
+	p = permute(px.y + Pi.y + oi); // p21, p22, p23
+	ox = fract(p * K) - Ko;
+	oy = mod7(floor(p * K)) * K - Ko;
+	dx = Pf.x - 0.5 + jitter * ox;
+	dy = Pf.y - of + jitter * oy;
+	vec3 d2 = dx * dx + dy * dy; // d21, d22 and d23, squared
+	p = permute(px.z + Pi.y + oi); // p31, p32, p33
+	ox = fract(p * K) - Ko;
+	oy = mod7(floor(p * K)) * K - Ko;
+	dx = Pf.x - 1.5 + jitter * ox;
+	dy = Pf.y - of + jitter * oy;
+	vec3 d3 = dx * dx + dy * dy; // d31, d32 and d33, squared
+	// Sort out the two smallest distances (F1, F2)
+	vec3 d1a = min(d1, d2);
+	d2 = max(d1, d2); // Swap to keep candidates for F2
+	d2 = min(d2, d3); // neither F1 nor F2 are now in d3
+	d1 = min(d1a, d2); // F1 is now in d1
+	d2 = max(d1a, d2); // Swap to keep candidates for F2
+	d1.xy = (d1.x < d1.y) ? d1.xy : d1.yx; // Swap if smaller
+	d1.xz = (d1.x < d1.z) ? d1.xz : d1.zx; // F1 is in d1.x
+	d1.yz = min(d1.yz, d2.yz); // F2 is now not in d2.yz
+	d1.y = min(d1.y, d1.z); // nor in  d1.z
+	d1.y = min(d1.y, d2.x); // F2 is in d1.y, we're done.
+	return sqrt(d1.xy);
+}
 float snoise(vec3 v)
 {
 	const vec2  C = vec2(1.0 / 6.0, 1.0 / 3.0);
@@ -104,7 +304,10 @@ void main() {
 	val += snoise(pos * 0.01 * vec3(1, 2, 1)) * 20;
 	val -= (1-abs(snoise(pos * 0.05))) * 3;
 	val += (1 - abs(snoise(pos * 0.02 * vec3(1, 0, 1)))) * 60 * clamp(snoise(pos * 0.001), 0, 1);
+	val -= pow(cellular(pos.xz * 0.04).x + 0.1, 4) * 40;
 	val = min(val, pos.y - 29);
+
+
 	int amogus = 1-clamp(int(round(val)), 0, 1);
 	
 	for (int i = 0; i < 7; i++) {
