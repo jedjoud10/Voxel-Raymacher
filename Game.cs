@@ -15,11 +15,11 @@ namespace Test123Bruh {
         int screenTexture;
         Compute compute;
         Quaternion rotation;
-        Vector3 position = new Vector3(64.0f, 50.0f, 64.0f);
+        Vector3 position = new Vector3((float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f);
         Matrix4 projMatrix;
         Matrix4 viewMatrix;
         Vector2 mousePosTest;
-        int selector = 6;
+        int selector = Voxel.levels-1;
         bool toggle;
         int scaleDown = 2;
         int frameSelector = 0;
@@ -27,6 +27,7 @@ namespace Test123Bruh {
         int maxIterations = 2;
         Voxel voxel = null;
         double last;
+        float timePassed;
 
         private static void OnDebugMessage(
             DebugSource source,     // Source of the debugging message.
@@ -95,10 +96,6 @@ namespace Test123Bruh {
 
             frameSelector += 1;
 
-            // Clear background (will get overwritten anyways)
-            //GL.ClearColor(Color4.Black);
-            //GL.Clear(ClearBufferMask.ColorBufferBit);
-
             // Update rotation
             CursorState = CursorState.Grabbed;
             mousePosTest += MouseState.Delta * 0.0006f;
@@ -132,7 +129,7 @@ namespace Test123Bruh {
             // Octree depth selector
             if (KeyboardState.IsKeyPressed(Keys.F4)) {
                 selector += 1;
-                selector = selector % 7;
+                selector = selector % Voxel.levels;
             }
 
             if (KeyboardState.IsKeyPressed(Keys.F2)) {
@@ -147,9 +144,13 @@ namespace Test123Bruh {
 
             // Create a rotation and position matrix based on current rotation and position
             viewMatrix = Matrix4.CreateFromQuaternion(rotation);
-            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(70.0f), (float)ClientSize.Y / (float)ClientSize.X, 0.1f, 1000.0f); 
+            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(70.0f), (float)ClientSize.Y / (float)ClientSize.X, 0.1f, 1000.0f);
+            //projMatrix = Matrix4.CreateOrthographic(300.0f, 300.0f, 0.01f, 10.00f);
 
             // Bind compute shader and execute it
+            //timePassed += (float)args.Time;
+            timePassed += 0.1f;
+            voxel.Update(timePassed);
             GL.UseProgram(compute.program);
             GL.ProgramUniform2(compute.program, 1, ClientSize.ToVector2() / scaleDown);
             GL.ProgramUniformMatrix4(compute.program, 2, false, ref viewMatrix);
@@ -157,7 +158,7 @@ namespace Test123Bruh {
             GL.ProgramUniform3(compute.program, 4, position);
             GL.ProgramUniform1(compute.program, 5, selector);
             GL.ProgramUniform1(compute.program, 6, frameSelector % 2);
-            GL.ProgramUniform1(compute.program, 7, voxel.size);
+            GL.ProgramUniform1(compute.program, 7, Voxel.size);
             GL.ProgramUniform1(compute.program, 8, debugSelector);
             GL.ProgramUniform1(compute.program, 9, 32 << maxIterations);
             GL.ActiveTexture(TextureUnit.Texture0);
