@@ -13,6 +13,8 @@ bool density(vec3 pos) {
 	val = min(val, pos.y - 32);
 	val = max(val, pos.y - 50);
 	val -= (1 - abs(snoise(pos * 0.02 * vec3(1, 2, 1)))) * 20;
+	val += abs(snoise(pos * 0.04 * vec3(1, 3, 1))) * 10;
+
 	int amogus = 1 - clamp(int(round(val)), 0, 1);
 	return amogus == 1;
 }
@@ -26,14 +28,9 @@ void main() {
 		{
 			for (int z = 0; z < 4; z++)
 			{
-				vec3 pos = vec3(gl_GlobalInvocationID * 4) + vec3(x, y, z);
+				vec3 pos = vec3(gl_GlobalInvocationID) + vec3(x, y, z) / 4.0;
 				int block = int(density(pos));
-				
-				//  && x == 0 && y == 0 && z == 0
-				if (block_out == 1 && y == 0) {
-					bitwise_data |= 1 << (x * 4 * 4 + y * 4 + z);
-				}
-				//bitwise_data |= (block_out & block) << (x*4*4+y*4+z);
+				bitwise_data |= uint64_t(block) << uint64_t(x * 16 + y * 4 + z);
 			}
 		}
 	}	

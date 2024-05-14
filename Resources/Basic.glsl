@@ -139,10 +139,9 @@ uvec2 tam(vec3 pos) {
 }
 
 bool check_inner_bits(vec3 pos, uint64_t bits) {
-	//pos += 0.5;
-	ivec3 internal = ivec3(floor(pos * 4) - floor(pos) * 4);
-	uint index = internal.x * 4 * 4 + internal.y * 4 + internal.z;
-	return (bits & (1 << index)) != 0;
+	uvec3 internal = uvec3(floor(pos * 4) - floor(pos) * 4);
+	uint index = internal.x * 16 + internal.y * 4 + internal.z;
+	return (bits & (uint64_t(1) << index)) != uint64_t(0);
 }
 
 vec3 block_normal(vec3 pos, vec3 normal) {
@@ -156,22 +155,12 @@ vec3 block_normal(vec3 pos, vec3 normal) {
 	return vec3(posx-nposx, posy-nposy, posz-nposz);
 }
 
-// simple lighting calculation stuff for when we hit a voxel
-vec3 lighting(inout vec3 pos, vec3 normal, vec3 ray_dir, inout float voxel_distance, inout bool hit) {
-	vec3 internal = floor(pos * 8.0) / 8.0;
-	vec3 color = vec3(1);
-	normal = block_normal(pos, normal);
-
-	vec3 light_dir = normalize(vec3(1, 1, 1));
-	float light = clamp(dot(normal, light_dir), 0, 1) + 0.3;
-	color = (normal.y > 0.5 ? vec3(17, 99, 0) : vec3(48, 36, 0));
-
+// trace WITHIN the voxel!!! (I love bitwise ops)
+void trace_internal(inout vec3 pos, vec3 ray_dir, inout float voxel_distance, inout bool hit) {
 	uvec2 inner = tam(pos);
 	uint64_t inner_bits = packUint2x32(inner);
 	vec3 min_pos = floor(pos);
 	vec3 max_pos = ceil(pos);
-
-	//return check_inner_bits(pos, inner_bits) ? vec3(1.0) : vec3(0.0);
 
 	for (int i = 0; i < 6; i++) {
 		vec3 grid_level_point = floor(pos / 0.25) * 0.25;
@@ -180,19 +169,54 @@ vec3 lighting(inout vec3 pos, vec3 normal, vec3 ray_dir, inout float voxel_dista
 
 		if (check_inner_bits(pos, inner_bits)) {
 			hit = true;
-			ivec3 internal2 = ivec3(floor(pos * 4) - floor(pos) * 4);
-			return vec3(internal2 * hash13(min_pos)) / 4.0;
-		}
-
-		if (grid_level_point) {
-			break;
+			return;
 		}
 
 		pos += ray_dir * (0.001 + voxel_distance);
+		if (any(greaterThanEqual(pos, max_pos)) || any(lessThanEqual(pos, min_pos))) {
+			break;
+		}
+	}
+
+	hit = false;
+}
+
+// simple lighting calculation stuff for when we hit a voxel
+vec3 lighting(vec3 pos, vec3 ray_dir) {
+	/*
+	vec3 internal = floor(pos * 4.0) / 4.0;
+	vec3 color = vec3(1);
+	normal = block_normal(pos, normal);
+
+	vec3 light_dir = normalize(vec3(1, 1, 1));
+	float light = clamp(dot(normal, light_dir), 0, 1) + 0.3;
+	color = (normal.y > 0.5 ? vec3(17, 99, 0) : vec3(48, 36, 0));
+	*/
+
+	vec3 aaa = floor(pos) - pos + 0.5;
+	return aaa;
+	/*
+	//pos += ray_dir * 0.03;
+	for (int i = 0; i < 6; i++) {
+		vec3 grid_level_point = floor(pos / 0.25) * 0.25;
+		vec2 distances = intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(0.25));
+		voxel_distance = distances.y - distances.x;
+
+		if (check_inner_bits(pos, inner_bits)) {
+			hit = true;
+			ivec3 internal2 = ivec3(floor(pos * 4) - floor(pos) * 4);
+			return vec3(internal2) / 4.0;
+		}
+
+		pos += ray_dir * (0.001 + voxel_distance);
+		if (any(greaterThanEqual(pos, max_pos)) || any(lessThanEqual(pos, min_pos))) {
+			break;
+		}
 	}
 
 	hit = false;
 	return vec3(0);
+	*/
 
 	//return vec3( / 1000.0, 0);
 	//return (color / 255.0) * light * 2.0;
@@ -252,10 +276,12 @@ void main() {
 		// do all of our lighting calculations here
 		if (hit) {
 			bool int_hit = false;
-			normal = (-(floor(pos) - pos + 0.5) / 0.5);
-			act_color = lighting(pos, normal, ray_dir, voxel_distance, int_hit);
+			//normal = (-(floor(pos) - pos + 0.5) / 0.5);
+			//act_color = lighting(pos, normal, ray_dir, voxel_distance, int_hit);
+			trace_internal(pos, ray_dir, voxel_distance, int_hit);
 
 			if (int_hit) {
+				act_color = lighting(pos, ray_dir);
 				break;
 			}
 		}
