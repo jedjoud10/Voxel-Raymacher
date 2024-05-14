@@ -44,11 +44,9 @@ namespace Test123Bruh {
 
             GL.UseProgram(generation.program);
 
-            for (int i = 0; i < levels; i++) {
-                GL.BindImageTexture(i, texture, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rg32ui);
-            }
-
+            
             //GL.Arb.UniformHandle(0, handles[0]);
+            GL.BindImageTexture(0, texture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rg32ui);
             GL.DispatchCompute(size / 4, size / 4, size / 4);
 
             testSize = size;

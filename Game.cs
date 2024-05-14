@@ -21,7 +21,7 @@ namespace Test123Bruh {
         Vector2 mousePosTest;
         int selector = Voxel.levels-1;
         bool toggle;
-        int scaleDown = 2;
+        int scaleDown = 4;
         int frameSelector = 0;
         int debugSelector = 0;
         int maxIterations = 2;
@@ -106,8 +106,10 @@ namespace Test123Bruh {
             Vector3 side = Vector3.Transform(Vector3.UnitX, rotation);
 
             // Update position and rotation
-            float speed = 30f;
+            float speed = KeyboardState.IsKeyDown(Keys.LeftControl) ? 5.0f : 30.0f;
             float delta = (float)(args.Time - last);
+
+
             if (KeyboardState.IsKeyDown(Keys.W)) {
                 position += forward * speed * delta;
             } else if (KeyboardState.IsKeyDown(Keys.S)) {

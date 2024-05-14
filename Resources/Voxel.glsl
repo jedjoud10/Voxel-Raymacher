@@ -19,6 +19,14 @@ bool density(vec3 pos) {
 	return amogus == 1;
 }
 
+float hash13(vec3 p3)
+{
+	p3 = fract(p3 * .1031);
+	p3 += dot(p3, p3.zyx + 31.32);
+	return fract((p3.x + p3.y) * p3.z);
+}
+
+
 void main() {
 	uint64_t bitwise_data = uint64_t(0);
 	int block_out = int(density(vec3(gl_GlobalInvocationID)));
@@ -31,6 +39,12 @@ void main() {
 				vec3 pos = vec3(gl_GlobalInvocationID) + vec3(x, y, z) / 4.0;
 				int block = int(density(pos));
 				bitwise_data |= uint64_t(block) << uint64_t(x * 16 + y * 4 + z);
+				
+				/*
+				if (hash13(pos) > 0.5) {
+					bitwise_data |= uint64_t(block_out) << uint64_t(x * 16 + y * 4 + z);
+				}
+				*/
 			}
 		}
 	}	
