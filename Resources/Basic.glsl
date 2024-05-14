@@ -1,5 +1,5 @@
 ﻿#version 460
-#extension GL_ARB_bindless_texture : enable
+#extension GL_ARB_gpu_shader_int64 : enable
 
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(rgba8, binding = 0, location = 0) uniform image2D image;
@@ -12,7 +12,7 @@ layout(location = 6) uniform int frame_selector;
 layout(location = 7) uniform int map_size;
 layout(location = 8) uniform int debug_selector;
 layout(location = 9) uniform int max_iters;
-layout(r32ui, binding = 1, location = 10, bindless_image) uniform uimage3D voxels[7];
+layout(rg32ui, binding = 1, location = 10) uniform uimage3D voxels[7];
 
 vec3 hash32(vec2 p)
 {
@@ -133,6 +133,18 @@ float at(vec3 pos) {
 	return imageLoad(voxels[0], tex_point).x == 0 ? 1.0 : 0.0;
 }
 
+uvec2 tam(vec3 pos) {
+	ivec3 tex_point = ivec3(floor(mod(pos, vec3(map_size, 100000, map_size))));
+	return imageLoad(voxels[0], tex_point).xy;
+}
+
+bool check_inner_bits(vec3 pos, uint64_t bits) {
+	//pos += 0.5;
+	ivec3 internal = ivec3(floor(pos * 4) - floor(pos) * 4);
+	uint index = internal.x * 4 * 4 + internal.y * 4 + internal.z;
+	return (bits & (1 << index)) != 0;
+}
+
 vec3 block_normal(vec3 pos, vec3 normal) {
 	float epsilon = 0.1;
 	float posx = at(pos + vec3(epsilon, 0, 0));
@@ -145,7 +157,7 @@ vec3 block_normal(vec3 pos, vec3 normal) {
 }
 
 // simple lighting calculation stuff for when we hit a voxel
-vec3 lighting(vec3 pos, vec3 normal, vec3 view) {
+vec3 lighting(inout vec3 pos, vec3 normal, vec3 ray_dir, inout float voxel_distance, inout bool hit) {
 	vec3 internal = floor(pos * 8.0) / 8.0;
 	vec3 color = vec3(1);
 	normal = block_normal(pos, normal);
@@ -153,7 +165,37 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 view) {
 	vec3 light_dir = normalize(vec3(1, 1, 1));
 	float light = clamp(dot(normal, light_dir), 0, 1) + 0.3;
 	color = (normal.y > 0.5 ? vec3(17, 99, 0) : vec3(48, 36, 0));
-	return (color / 255.0) * light * 2.0;
+
+	uvec2 inner = tam(pos);
+	uint64_t inner_bits = packUint2x32(inner);
+	vec3 min_pos = floor(pos);
+	vec3 max_pos = ceil(pos);
+
+	//return check_inner_bits(pos, inner_bits) ? vec3(1.0) : vec3(0.0);
+
+	for (int i = 0; i < 6; i++) {
+		vec3 grid_level_point = floor(pos / 0.25) * 0.25;
+		vec2 distances = intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(0.25));
+		voxel_distance = distances.y - distances.x;
+
+		if (check_inner_bits(pos, inner_bits)) {
+			hit = true;
+			ivec3 internal2 = ivec3(floor(pos * 4) - floor(pos) * 4);
+			return vec3(internal2 * hash13(min_pos)) / 4.0;
+		}
+
+		if (grid_level_point) {
+			break;
+		}
+
+		pos += ray_dir * (0.001 + voxel_distance);
+	}
+
+	hit = false;
+	return vec3(0);
+
+	//return vec3( / 1000.0, 0);
+	//return (color / 255.0) * light * 2.0;
 }
 
 void main() {
@@ -161,6 +203,8 @@ void main() {
 	if ((mod(gl_GlobalInvocationID.x, 2) == 1 ^^ mod(gl_GlobalInvocationID.y, 2) == 0) ^^ (frame_selector == 0)) {
 		//return;
 	}
+
+
 
 	// remap coords to ndc range (-1, 1)
 	vec2 coords = gl_GlobalInvocationID.xy / resolution;
@@ -170,6 +214,7 @@ void main() {
 	// apply projection transformations for ray dir
 	vec3 ray_dir = (view_matrix * proj_matrix * vec4(coords, 1, 0)).xyz;
 	ray_dir = normalize(ray_dir);
+	//ray_dir = floor(ray_dir * 100) / 100.0;
 
 	// ray marching stuff
 	vec3 pos = position;
@@ -206,9 +251,13 @@ void main() {
 		
 		// do all of our lighting calculations here
 		if (hit) {
+			bool int_hit = false;
 			normal = (-(floor(pos) - pos + 0.5) / 0.5);
-			act_color = lighting(pos, normal, ray_dir);
-			break;
+			act_color = lighting(pos, normal, ray_dir, voxel_distance, int_hit);
+
+			if (int_hit) {
+				break;
+			}
 		}
 	}
 
@@ -241,5 +290,6 @@ void main() {
 
 	//color = vec3(gl_LocalInvocationID.xy, 0) / vec3(32);
 	// store the value in the image that we will blit
+	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(vec2(gl_GlobalInvocationID.xy) / 800.0, abs(sin(gl_GlobalInvocationID.x)), 0));
 	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 0));
 }

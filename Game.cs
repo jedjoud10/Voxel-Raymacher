@@ -184,7 +184,7 @@ namespace Test123Bruh {
 
                 var bitmap = new System.Drawing.Bitmap(ClientSize.X, ClientSize.Y);
                 var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, ClientSize.X, ClientSize.Y), ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                GL.ReadPixels(0, 0, ClientSize.X, ClientSize.Y, PixelFormat.Rgba, PixelType.UnsignedByte, data.Scan0);
+                GL.ReadPixels(0, 0, ClientSize.X, ClientSize.Y, PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
                 bitmap.UnlockBits(data);
                 bitmap.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
                 File.Create(ssPath).Dispose();

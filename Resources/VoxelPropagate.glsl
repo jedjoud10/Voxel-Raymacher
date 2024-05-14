@@ -1,12 +1,12 @@
 ﻿#version 460 core
-#extension GL_ARB_bindless_texture : enable
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
-layout(rg32ui, binding = 0, location = 0, bindless_image) uniform uimage3D last_voxels;
-layout(rg32ui, binding = 1, location = 1, bindless_image) uniform uimage3D next_voxels;
+layout(rg32ui, binding = 0, location = 0) uniform uimage3D last_voxels;
+layout(rg32ui, binding = 1, location = 1) uniform uimage3D next_voxels;
 
 void main() {
-	imageLoad(last_voxels, gl_GlobalInvocationID);
+
+	bool nice = false;
 
 	for (int x = 0; x < 2; x++)
 	{
@@ -14,8 +14,13 @@ void main() {
 		{
 			for (int z = 0; z < 2; z++)
 			{
-
+				vec2 dat = imageLoad(last_voxels, ivec3(gl_GlobalInvocationID * 2) + ivec3(x, y, z)).xy;
+				nice = nice || (dat.x > 0.0 || dat.y > 0.0);
 			}
 		}
+	}
+
+	if (nice) {
+		imageStore(next_voxels, ivec3(gl_GlobalInvocationID), uvec4(1));
 	}
 }
