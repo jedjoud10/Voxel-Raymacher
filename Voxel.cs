@@ -73,14 +73,5 @@ namespace Test123Bruh {
 
             //GL.Arb.UniformHandle(10, handles.Length, handles);
         }
-
-        public void Update(float timePassed) {
-            /*
-            GL.UseProgram(generation.program);
-            GL.Uniform1(0, timePassed);
-            GL.Arb.UniformHandle(1, handles.Length, handles);
-            GL.DispatchCompute(size / 4, size / 4, size / 4);
-            */
-        }
     }
 }

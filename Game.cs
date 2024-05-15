@@ -8,27 +8,23 @@ using System.Runtime.Serialization;
 using System.Drawing.Imaging;
 using System.IO;
 using PixelFormat = OpenTK.Graphics.OpenGL4.PixelFormat;
+using ImGuiNET;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace Test123Bruh {
     internal class Game : GameWindow {
         int fbo;
         int screenTexture;
-        Compute compute;
-        Quaternion rotation;
-        Vector3 position = new Vector3((float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f);
-        Matrix4 projMatrix;
-        Matrix4 viewMatrix;
-        Vector2 mousePosTest;
-        int selector = Voxel.levels-1;
-        bool toggle;
-        int scaleDown = 4;
-        int frameSelector = 0;
-        int debugSelector = 0;
-        int maxIterations = 2;
+        int scaleDown = 2;
+        Compute compute = null;
+        ImGuiController controller = null;
         Voxel voxel = null;
-        double last;
-        float timePassed;
-
+        Movement movement = null;
+        
+        int max_level_iter = Voxel.levels-1;
+        int max_iter = 128;
+        int debug_view = 0;
+        
         private static void OnDebugMessage(
             DebugSource source,     // Source of the debugging message.
             DebugType type,         // Type of the debugging message.
@@ -38,17 +34,8 @@ namespace Test123Bruh {
             IntPtr pMessage,        // Pointer to message string.
             IntPtr pUserParam)      // The pointer you gave to OpenGL, explained later.
         {
-            // In order to access the string pointed to by pMessage, you can use Marshal
-            // class to copy its contents to a C# string without unsafe code. You can
-            // also use the new function Marshal.PtrToStringUTF8 since .NET Core 1.1.
             string message = Marshal.PtrToStringAnsi(pMessage, length);
-
-            // The rest of the function is up to you to implement, however a debug output
-            // is always useful.
             Console.WriteLine("[{0} source={1} type={2} id={3}] {4}", severity, source, type, id, message);
-
-            // Potentially, you may want to throw from the function for certain severity
-            // messages.
             if (type == DebugType.DebugTypeError) {
                 throw new Exception(message);
             }
@@ -58,6 +45,8 @@ namespace Test123Bruh {
         }
 
         protected override void OnLoad() {
+            base.OnLoad();
+
             GL.DebugMessageCallback(OnDebugMessage, 0);
             GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.DebugOutputSynchronous);
@@ -66,18 +55,14 @@ namespace Test123Bruh {
             GL.BindTexture(TextureTarget.Texture2D, screenTexture);
             GL.TextureStorage2D(screenTexture, 1, SizedInternalFormat.Rgba8, ClientSize.X, ClientSize.Y);
 
-
             fbo = GL.GenFramebuffer();
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
             GL.NamedFramebufferTexture(fbo, FramebufferAttachment.ColorAttachment0, screenTexture, 0);
 
-
             compute = new Compute("Basic.glsl");
             voxel = new Voxel();
-            
-
-
-            base.OnLoad();
+            controller = new ImGuiController(ClientSize.X, ClientSize.Y);
+            movement = new Movement();
         }
 
         protected override void OnFramebufferResize(FramebufferResizeEventArgs e) {
@@ -89,110 +74,106 @@ namespace Test123Bruh {
             GL.BindTexture(TextureTarget.Texture2D, screenTexture);
             GL.TextureStorage2D(screenTexture, 1, SizedInternalFormat.Rgba8, e.Width, e.Height);
             GL.NamedFramebufferTexture(fbo, FramebufferAttachment.ColorAttachment0, screenTexture, 0);
+            GL.Viewport(0, 0, e.Width, e.Height);
+            controller.WindowResized(e.Width, e.Height);
         }
 
-        protected override void OnUpdateFrame(FrameEventArgs args) {
-            base.OnUpdateFrame(args);
+        protected override void OnTextInput(TextInputEventArgs e) {
+            base.OnTextInput(e);
+            controller.PressChar((char)e.Unicode);
+        }
 
-            frameSelector += 1;
+        protected override void OnMouseWheel(MouseWheelEventArgs e) {
+            base.OnMouseWheel(e);
+            controller.MouseScroll(e.Offset);
+        }
 
-            // Update rotation
-            CursorState = CursorState.Grabbed;
-            mousePosTest += MouseState.Delta * 0.0006f;
-            rotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
+        private void Screenshot() {
+            string execPath = System.Reflection.Assembly.GetEntryAssembly().Location;
+            execPath = Path.GetDirectoryName(execPath);
+            string dirPath = Path.Combine(execPath, "Screenshots");
+            var time = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss") + ".jpg";
+            Directory.CreateDirectory(dirPath);
+            string ssPath = Path.Combine(dirPath, time);
 
-            Vector3 forward = Vector3.Transform(-Vector3.UnitZ, rotation);
-            Vector3 up = Vector3.Transform(Vector3.UnitY, rotation);
-            Vector3 side = Vector3.Transform(Vector3.UnitX, rotation);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
-            // Update position and rotation
-            float speed = KeyboardState.IsKeyDown(Keys.LeftControl) ? 5.0f : 30.0f;
-            float delta = (float)(args.Time - last);
+            var bitmap = new System.Drawing.Bitmap(ClientSize.X, ClientSize.Y);
+            var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, ClientSize.X, ClientSize.Y), ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            GL.ReadPixels(0, 0, ClientSize.X, ClientSize.Y, PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
+            bitmap.UnlockBits(data);
+            bitmap.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
+            File.Create(ssPath).Dispose();
+            bitmap.Save(ssPath, ImageFormat.Jpeg);
+        }
 
+        private void ImGuiDebug(float delta) {
+            // Render ImGui Stuff!!!
+            bool t = true;
+            ImGui.Begin("Voxel Raymarcher Test Window!", ref t, ImGuiWindowFlags.MenuBar);
+            ImGui.Text("Frame timings: " + delta + ", FPS: " + (1.0 / delta));
+            ImGui.Text("F5: Toggle Fullscreen");
+            ImGui.Text("F4: Toggle Normal/Grabbed Mouse");
+            ImGui.Text("F3: Take screenshot and save it as Jpeg");
+            ImGui.ListBox("Debug View Type", ref debug_view, new string[] {
+                "Non-Debug", "Map intersection normal", "Total iterations",
+                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals" }, 7);
+            ImGui.SliderInt("Max Iters", ref max_iter, 0, 512);
+            ImGui.SliderInt("Starting Mip-chain Depth", ref max_level_iter, 0, Voxel.levels - 1);
+            ImGui.End();
 
-            if (KeyboardState.IsKeyDown(Keys.W)) {
-                position += forward * speed * delta;
-            } else if (KeyboardState.IsKeyDown(Keys.S)) {
-                position += -forward * speed * delta;
+            //ImGui.DockSpaceOverViewport();
+            //ImGui.ShowDemoWindow();
+        }
+
+        protected override void OnRenderFrame(FrameEventArgs args) {
+            base.OnRenderFrame(args);
+
+            float delta = (float)args.Time;
+            controller.Update(this, delta);
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+            GL.ClearColor(new Color4(0, 32, 48, 255));
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
+
+            if (CursorState == CursorState.Grabbed) {
+                movement.Update(MouseState, KeyboardState, (float)ClientSize.Y / (float)ClientSize.X, delta);
             }
             
-            if (KeyboardState.IsKeyDown(Keys.A)) {
-                position += -side * speed * delta;
-            } else if (KeyboardState.IsKeyDown(Keys.D)) {
-                position += side * speed * delta;
-            }
-
-            // Fullscreen toggle
+            // Fullscreen toggle 
             if (KeyboardState.IsKeyPressed(Keys.F5)) {
-                toggle = !toggle;
-                WindowState = toggle ? WindowState.Fullscreen : WindowState.Normal;
+                WindowState = 3 - WindowState;
             }
-
-            // Octree depth selector
+            
+            // Cursor toggle
             if (KeyboardState.IsKeyPressed(Keys.F4)) {
-                selector += 1;
-                selector = selector % Voxel.levels;
+                CursorState = 2 - CursorState;
             }
-
-            if (KeyboardState.IsKeyPressed(Keys.F2)) {
-                debugSelector += 1;
-                debugSelector = debugSelector % 4;
-            }
-
-            if (KeyboardState.IsKeyPressed(Keys.F1)) {
-                maxIterations += 1;
-                maxIterations = maxIterations % 5;
-            }
-
-            // Create a rotation and position matrix based on current rotation and position
-            viewMatrix = Matrix4.CreateFromQuaternion(rotation);
-            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(70.0f), (float)ClientSize.Y / (float)ClientSize.X, 0.1f, 1000.0f);
-            //projMatrix = Matrix4.CreateOrthographic(300.0f, 300.0f, 0.01f, 10.00f);
 
             // Bind compute shader and execute it
-            //timePassed += (float)args.Time;
-            timePassed += 0.1f;
-            voxel.Update(timePassed);
             GL.UseProgram(compute.program);
-            GL.ProgramUniform2(compute.program, 1, ClientSize.ToVector2() / scaleDown);
-            GL.ProgramUniformMatrix4(compute.program, 2, false, ref viewMatrix);
-            GL.ProgramUniformMatrix4(compute.program, 3, false, ref projMatrix);
-            GL.ProgramUniform3(compute.program, 4, position);
-            GL.ProgramUniform1(compute.program, 5, selector);
-            GL.ProgramUniform1(compute.program, 6, frameSelector % 2);
-            GL.ProgramUniform1(compute.program, 7, Voxel.size);
-            GL.ProgramUniform1(compute.program, 8, debugSelector);
-            GL.ProgramUniform1(compute.program, 9, 32 << maxIterations);
-            GL.ActiveTexture(TextureUnit.Texture0);
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
+            GL.ProgramUniform2(compute.program, 1, ClientSize.ToVector2() / scaleDown);
+            GL.ProgramUniformMatrix4(compute.program, 2, false, ref movement.viewMatrix);
+            GL.ProgramUniformMatrix4(compute.program, 3, false, ref movement.projMatrix);
+            GL.ProgramUniform3(compute.program, 4, movement.position);
+            GL.ProgramUniform1(compute.program, 5, max_level_iter);
+            GL.ProgramUniform1(compute.program, 6, max_iter);
+            GL.ProgramUniform1(compute.program, 7, Voxel.size);
+            GL.ProgramUniform1(compute.program, 8, debug_view);
             voxel.Bind(compute.program);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
             GL.DispatchCompute(x, y, 1);
-
-            // Copy texture back to main FBO
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
-            
+
             // Screenshotting
             if (KeyboardState.IsKeyPressed(Keys.F3)) {
-                string execPath = System.Reflection.Assembly.GetEntryAssembly().Location;
-                execPath = Path.GetDirectoryName(execPath);
-                string dirPath = Path.Combine(execPath, "Screenshots");
-                var time = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss") + ".jpg";
-                Directory.CreateDirectory(dirPath);
-                string ssPath = Path.Combine(dirPath, time);
-
-                GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-
-                var bitmap = new System.Drawing.Bitmap(ClientSize.X, ClientSize.Y);
-                var data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, ClientSize.X, ClientSize.Y), ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
-                GL.ReadPixels(0, 0, ClientSize.X, ClientSize.Y, PixelFormat.Bgra, PixelType.UnsignedByte, data.Scan0);
-                bitmap.UnlockBits(data);
-                bitmap.RotateFlip(System.Drawing.RotateFlipType.RotateNoneFlipY);
-                File.Create(ssPath).Dispose();
-                bitmap.Save(ssPath, ImageFormat.Jpeg);
+                Screenshot();
             }
 
+            ImGuiDebug(delta);
+            controller.Render();
+            ImGuiController.CheckGLError("End of frame");
             SwapBuffers();
         }
     }
