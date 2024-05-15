@@ -20,10 +20,12 @@ namespace Test123Bruh {
         ImGuiController controller = null;
         Voxel voxel = null;
         Movement movement = null;
-        
+        Skybox skybox = null;
+
         int maxLevelIter = Voxel.levels-1;
         int maxIter = 128;
         int maxReflections = 1;
+        float reflectionRoughness = 0.2f;
         int debugView = 0;
         bool useSubVoxels = false;
         ulong frameCount = 0;
@@ -54,6 +56,7 @@ namespace Test123Bruh {
 
             GL.DebugMessageCallback(OnDebugMessage, 0);
             GL.Enable(EnableCap.DebugOutput);
+            GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DebugOutputSynchronous);
 
             screenTexture = GL.GenTexture();
@@ -68,6 +71,7 @@ namespace Test123Bruh {
             voxel = new Voxel();
             controller = new ImGuiController(ClientSize.X, ClientSize.Y);
             movement = new Movement();
+            skybox = new Skybox();
         }
 
         protected override void OnFramebufferResize(FramebufferResizeEventArgs e) {
@@ -128,10 +132,13 @@ namespace Test123Bruh {
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 128);
             ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
             ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 4);
+            ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 1.0f);
             ImGui.ListBox("Resolution Scale-down Factor", ref scaleDownFactor, new string[] {
                 "1x (Native)", "2x", "4x",
                 "8x" }, 4);
             ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
+            ImGui.Text("Map Size: " + Voxel.size);
+            ImGui.Text("Map Max Levels: " + Voxel.levels);
             ImGui.End();            
 
             //ImGui.DockSpaceOverViewport();
@@ -179,19 +186,23 @@ namespace Test123Bruh {
             GL.ProgramUniform1(compute.program, 8, debugView);
             GL.ProgramUniform1(compute.program, 9, maxReflections);
             GL.ProgramUniform1(compute.program, 10, useSubVoxels ? 1 : 0);
-            voxel.Bind(compute.program);
+            GL.ProgramUniform1(compute.program, 11, reflectionRoughness);
+            voxel.Bind(1);
+
+            GL.BindTextureUnit(2, skybox.texture);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
             GL.DispatchCompute(x, y, 1);
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+
+            ImGuiDebug(delta);
+            controller.Render();
 
             // Screenshotting
             if (KeyboardState.IsKeyPressed(Keys.F3)) {
                 Screenshot();
             }
 
-            ImGuiDebug(delta);
-            controller.Render();
             ImGuiController.CheckGLError("End of frame");
             SwapBuffers();
         }

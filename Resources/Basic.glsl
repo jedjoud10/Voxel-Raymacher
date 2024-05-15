@@ -1,6 +1,5 @@
 ﻿#version 460
 #extension GL_ARB_gpu_shader_int64 : enable
-
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(rgba8, binding = 0, location = 0) uniform image2D image;
 layout(location = 1) uniform vec2 resolution;
@@ -13,26 +12,12 @@ layout(location = 7) uniform int map_size;
 layout(location = 8) uniform int debug_view;
 layout(location = 9) uniform int max_reflections;
 layout(location = 10) uniform int use_sub_voxels;
-layout(rg32ui, binding = 1, location = 11) uniform uimage3D voxels[7];
+layout(location = 11) uniform float reflection_roughness;
+layout(rg32ui, binding = 1) uniform uimage3D voxels[7];
+layout(binding = 2) uniform samplerCube skybox;
 
-vec3 hash32(vec2 p)
-{
-	vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
-	p3 += dot(p3, p3.yxz + 33.33);
-	return fract((p3.xxy + p3.yzz) * p3.zyx);
-}
-float hash12(vec2 p)
-{
-	vec3 p3 = fract(vec3(p.xyx) * .1031);
-	p3 += dot(p3, p3.yzx + 33.33);
-	return fract((p3.x + p3.y) * p3.z);
-}
-float hash13(vec3 p3)
-{
-	p3 = fract(p3 * .1031);
-	p3 += dot(p3, p3.zyx + 31.32);
-	return fract((p3.x + p3.y) * p3.z);
-}
+#include Hashes.glsl
+#include Lighting.glsl
 
 // 3d cube vs ray intersection that allows us to calculate closest distance to face of cube
 vec2 intersection(vec3 pos, vec3 dir, vec3 smol, vec3 beig, inout int max_dir, inout int min_dir) {
@@ -73,14 +58,9 @@ vec2 intersection(vec3 pos, vec3 dir, vec3 smol, vec3 beig, inout int max_dir, i
 	return vec2(tmin, tmax);
 }
 
-// simple lighting calculation for the sky background
-vec3 sky(vec3 normal) {
-	return vec3(0.2);
-}
-
 // fetches the 64 bit 4x4x4 sub-voxel volume for one voxel
 uint64_t get_binary_data(vec3 pos) {
-	ivec3 tex_point = ivec3(floor(mod(pos, vec3(map_size, 100000, map_size))));
+	ivec3 tex_point = ivec3(floor(pos));
 	return packUint2x32(imageLoad(voxels[0], tex_point).xy);
 }
 
@@ -174,23 +154,6 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, inout float voxel_distance, in
 	hit = false;
 }
 
-// simple lighting calculation stuff for when we hit a voxel
-vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir) {
-	vec3 small = floor(pos * 4);
-	vec3 smooth_normal = (-(floor(pos * 4) - (pos * 4) + 0.5) / 0.5);
-	smooth_normal = normalize(smooth_normal);
-	vec3 internal = floor(pos * 4.0) / 4.0;
-	vec3 light_dir = normalize(vec3(1, 1, 1));
-	
-	float light = clamp(dot(normal, light_dir), 0, 1) + 0.3;
-	vec3 color = vec3(1);
-	color = (normal.y > 0.5 ? vec3(17, 99, 0) : vec3(48, 36, 0));
-
-	//return vec3(pow(dot(reflect(ray_dir, normal), light_dir), 10));
-	return (color / 255.0) * (hash13(small) * 0.3 + 0.7);
-	//return (color / 255.0) * light;
-}
-
 void main() {
 	// remap coords to ndc range (-1, 1)
 	vec2 coords = gl_GlobalInvocationID.xy / resolution;
@@ -206,7 +169,7 @@ void main() {
 	bool hit = false;
 
 	// vars for default view
-	vec3 color = vec3(-1.0);
+	vec3 color = vec3(0.0);
 	vec3 normal = vec3(0);
 
 	// debug stuffs
@@ -243,13 +206,19 @@ void main() {
 			if (temp_hit || use_sub_voxels == 0) {
 				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
+						//ray_dir = refract(ray_dir, normal, 1.4);
 						ray_dir = reflect(ray_dir, normal);
-						ray_dir += hash32(coords * 31.5143) * 0.06 - 0.03;
+						ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
 						ray_dir = normalize(ray_dir);
 
-						pos += ray_dir * 0.1;
+						pos += ray_dir * 0.01;
 						reflections_iters += 1;
 						continue;
+					}
+					else {
+						color = sky(ray_dir);
+						hit = true;
+						break;
 					}
 				}
 
@@ -292,8 +261,6 @@ void main() {
 	else if (debug_view == 6) {
 		color = normal;
 	}
-
-
 
 	// store the value in the image that we will blit
 	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 0));

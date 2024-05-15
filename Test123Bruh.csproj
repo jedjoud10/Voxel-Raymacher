@@ -23,7 +23,10 @@
 
   <ItemGroup>
     <None Remove="Resources\BasicCopy.glsl" />
+    <None Remove="Resources\Hashes.glsl" />
+    <None Remove="Resources\Lighting.glsl" />
     <None Remove="Resources\Noise.glsl" />
+    <None Remove="Resources\Skybox.glsl" />
     <None Remove="Resources\Voxel.glsl" />
     <None Remove="Resources\VoxelPropagate.glsl" />
   </ItemGroup>

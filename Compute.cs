@@ -13,7 +13,8 @@ namespace Test123Bruh {
     internal class Compute {
         public int program;
         public Compute(string path) {
-            string source = ReadSource(path);
+            List<string> deps = new List<string>();
+            string source = ReadSource(path, ref deps);
             int temp = GL.CreateShader(ShaderType.ComputeShader);
             GL.ShaderSource(temp, source);
             GL.CompileShader(temp);
@@ -35,20 +36,21 @@ namespace Test123Bruh {
             GL.ValidateProgram(program);
         }  
 
-        private static string ReadSource(string path) {
+        private static string ReadSource(string path, ref List<string> deps) {
             string source = File.ReadAllText(Path.Combine(GetResourceDir(), path));
-            source = Preprocess(source);
+            source = Preprocess(source, ref deps);
             return source;
         }
 
         private static string GetResourceDir() {
             string execPath = System.Reflection.Assembly.GetEntryAssembly().Location;
             execPath = Path.GetDirectoryName(execPath);
+            execPath = AppDomain.CurrentDomain.BaseDirectory;
             string global = Path.Combine(execPath, "Resources");
             return global;
         }
 
-        private static string Preprocess(string input) {
+        private static string Preprocess(string input, ref List<string> deps) {
             string output = "";
             using (StringReader sr = new StringReader(input)) {
                 string line;
@@ -56,7 +58,13 @@ namespace Test123Bruh {
                     if (line.StartsWith("#include")) {
                         string[] args = line.Split(" ");
                         string name = args[1];
-                        output += "\n" + ReadSource(name);
+
+                        if (!deps.Contains(name)) {
+                            output += "\n" + ReadSource(name, ref deps);
+                            deps.Add(name);
+                        } else {
+                            output += "\n";
+                        }
                     } else {
                         output += "\n" + line;
                     }
