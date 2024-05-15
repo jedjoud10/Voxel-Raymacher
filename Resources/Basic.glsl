@@ -11,7 +11,9 @@ layout(location = 5) uniform int max_mip_iter;
 layout(location = 6) uniform int max_iters;
 layout(location = 7) uniform int map_size;
 layout(location = 8) uniform int debug_view;
-layout(rg32ui, binding = 1, location = 10) uniform uimage3D voxels[7];
+layout(location = 9) uniform int max_reflections;
+layout(location = 10) uniform int use_sub_voxels;
+layout(rg32ui, binding = 1, location = 11) uniform uimage3D voxels[7];
 
 vec3 hash32(vec2 p)
 {
@@ -76,34 +78,6 @@ vec3 sky(vec3 normal) {
 	return vec3(0.2);
 }
 
-// recrusviely go through the mip chain
-void recurse(vec3 pos, vec3 ray_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached) {
-	// recursively iterate through the mip maps (starting at the highest level)
-	// check each level for big empty spaces that we can skip over
-	for (int j = max_mip_iter; j >= 0; j--) {
-		// use the mip maps themselves as an acceleration structure
-		float scale_factor = pow(2, j);
-		vec3 grid_level_point = floor(pos / scale_factor) * scale_factor;
-
-		// calculate temporary distance to the end of the current cell for the current mipmap
-		int a = 0;
-		int b = 0;
-		vec2 distances = intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(scale_factor), a, b);
-		float t_voxel_distance = distances.y - distances.x;
-
-		// modulo scale for repeating the maps
-		vec3 modulo_scale = vec3(map_size / scale_factor, 100000, map_size / scale_factor);
-		ivec3 tex_point = ivec3(floor(mod(pos / scale_factor, modulo_scale)));
-
-		if (imageLoad(voxels[j], tex_point).x == 0) {
-			voxel_distance = t_voxel_distance;
-			hit = false;
-			min_level_reached = min(min_level_reached, j);
-			break;
-		}
-	}
-}
-
 // fetches the 64 bit 4x4x4 sub-voxel volume for one voxel
 uint64_t get_binary_data(vec3 pos) {
 	ivec3 tex_point = ivec3(floor(mod(pos, vec3(map_size, 100000, map_size))));
@@ -130,6 +104,40 @@ vec3 get_internal_box_normal(int side, vec3 ray_dir) {
 	}
 
 	return vec3(0);
+}
+
+// recrusviely go through the mip chain
+void recurse(vec3 pos, vec3 ray_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout vec3 normal) {
+	// recursively iterate through the mip maps (starting at the highest level)
+	// check each level for big empty spaces that we can skip over
+	for (int j = max_mip_iter; j >= 0; j--) {
+		// use the mip maps themselves as an acceleration structure
+		float scale_factor = pow(2, j);
+		vec3 grid_level_point = floor(pos / scale_factor) * scale_factor;
+
+		// calculate temporary distance to the end of the current cell for the current mipmap
+		int a = 0;
+		int b = 0;
+		vec2 distances = intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(scale_factor), a, b);
+		float t_voxel_distance = distances.y - distances.x;
+
+		// modulo scale for repeating the maps
+		vec3 modulo_scale = vec3(map_size / scale_factor, 100000, map_size / scale_factor);
+		ivec3 tex_point = ivec3(floor(mod(pos / scale_factor, modulo_scale)));
+
+		if (imageLoad(voxels[j], tex_point).x == 0) {
+			voxel_distance = t_voxel_distance;
+			hit = false;
+			min_level_reached = min(min_level_reached, j);
+
+			int min_side_hit = 0;
+			int max_side_hit = 0;
+			intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(scale_factor), min_side_hit, max_side_hit);
+			normal = get_internal_box_normal(max_side_hit, ray_dir);
+
+			break;
+		}
+	}
 }
 
 // trace WITHIN the voxel!!! (I love bitwise ops)
@@ -168,6 +176,7 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, inout float voxel_distance, in
 
 // simple lighting calculation stuff for when we hit a voxel
 vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir) {
+	vec3 small = floor(pos * 4);
 	vec3 smooth_normal = (-(floor(pos * 4) - (pos * 4) + 0.5) / 0.5);
 	smooth_normal = normalize(smooth_normal);
 	vec3 internal = floor(pos * 4.0) / 4.0;
@@ -178,7 +187,8 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir) {
 	color = (normal.y > 0.5 ? vec3(17, 99, 0) : vec3(48, 36, 0));
 
 	//return vec3(pow(dot(reflect(ray_dir, normal), light_dir), 10));
-	return (color / 255.0) * light;
+	return (color / 255.0) * (hash13(small) * 0.3 + 0.7);
+	//return (color / 255.0) * light;
 }
 
 void main() {
@@ -199,9 +209,6 @@ void main() {
 	vec3 color = vec3(-1.0);
 	vec3 normal = vec3(0);
 
-	// const settings
-	int max_reflections = 1;
-
 	// debug stuffs
 	float total_iterations = 0.0;
 	float total_mip_map_iterations = 0.0;
@@ -216,12 +223,11 @@ void main() {
 
 		// we know the map isn't *that* big
 		if (any(greaterThan(pos, vec3(map_size))) || any(lessThan(pos, vec3(0)))) {
-			hit = false;
 			break;
 		}
 
 		// recursively go through the mip chain
-		recurse(pos, ray_dir, temp_hit, voxel_distance, min_level_reached);
+		recurse(pos, ray_dir, temp_hit, voxel_distance, min_level_reached, normal);
 
 		// gotta add a small offset since we'd be on the very face of the voxel
 		pos += ray_dir * (0.001 + voxel_distance);
@@ -229,18 +235,23 @@ void main() {
 		// do all of our lighting calculations here
 		if (temp_hit) {
 			temp_hit = false;
-			trace_internal(pos, ray_dir, voxel_distance, temp_hit, normal, total_inner_bit_fetches);
 
-			if (temp_hit) {
-				/*
-				if (pos.y < 33) {
+			if (use_sub_voxels == 1) {
+				trace_internal(pos, ray_dir, voxel_distance, temp_hit, normal, total_inner_bit_fetches);
+			}
+
+			if (temp_hit || use_sub_voxels == 0) {
+				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
-						ray_dir = reflect(ray_dir, vec3(0, 1, 0));
+						ray_dir = reflect(ray_dir, normal);
+						ray_dir += hash32(coords * 31.5143) * 0.06 - 0.03;
+						ray_dir = normalize(ray_dir);
+
+						pos += ray_dir * 0.1;
 						reflections_iters += 1;
 						continue;
 					}
 				}
-				*/
 
 				color = lighting(pos, normal, ray_dir);
 				hit = true;
@@ -251,27 +262,20 @@ void main() {
 
 	// ACTUAL GAME VIEW
 	if (debug_view == 0) {	
-		/*
+		float factor = float(reflections_iters) / float(max(max_reflections, 1));
+
 		if (!hit) {
 			color = sky(ray_dir);
 		}
-		*/
+
+		color *= (1 - factor) * 0.2 + 0.8;
 	}
 	
 	else if (debug_view == 1) {
 		int min_dir = 0;
 		int max_dir = 0;
 		vec2 dists = intersection(pos, ray_dir, vec3(0), vec3(map_size), min_dir, max_dir);
-		
-		if (max_dir == 0) {
-			color = vec3(1, 0, 0);
-		}
-		else if (max_dir == 1) {
-			color = vec3(0, 1, 0);
-		}
-		else if (max_dir == 2) {
-			color = vec3(0, 0, 1);
-		}
+		color = get_internal_box_normal(max_dir, ray_dir);
 	}
 	else if (debug_view == 2) {
 		color = vec3(total_iterations / float(max_iters));

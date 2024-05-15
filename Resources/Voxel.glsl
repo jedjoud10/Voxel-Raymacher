@@ -5,19 +5,29 @@
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 layout(rg32ui, binding = 0, location = 0) uniform uimage3D voxels;
 
+float sdBox(vec3 p, vec3 b)
+{
+	vec3 q = abs(p) - b;
+	return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
+}
+
 bool density(vec3 pos) {
 	float val = pos.y - 30;
-	val += snoise(pos * 0.01 * vec3(1, 2, 1)) * 20;
-	val += (1 - abs(snoise(pos * 0.02 * vec3(1, 0, 1)))) * 60 * clamp(snoise(pos * 0.001), 0, 1);
-	val -= pow(cellular(pos.xz * 0.04).x + 0.1, 4) * 40;
-	val = min(val, pos.y - 32);
-	val = max(val, pos.y - 50);
+	val += snoise(pos * 0.05 * vec3(1, 2, 1)) * 10;
+	//val += (1 - abs(snoise(pos * 0.02 * vec3(1, 0, 1)))) * 20;
+	//val -= pow(cellular(pos.xz * 0.04).x + 0.1, 4) * 10;
+	//val = min(val, pos.y - 32);
+	//val = max(val, pos.y - 50);
 	//val -= (1 - abs(snoise(pos * 0.02 * vec3(1, 2, 1)))) * 20;
 	//val += abs(snoise(pos * 0.04 * vec3(1, 3, 1))) * 10;
 	//val = min(val, pos.y - 60);
+	
+	/*
+	float boxu = sdBox(pos - vec3(32, 30, 64), vec3(10, 6, 2));
+	val = min(val, boxu);
+	*/
 
-	int amogus = 1 - clamp(int(round(val)), 0, 1);
-	return amogus == 1;
+	return round(val) <= 0;
 }
 
 float hash13(vec3 p3)

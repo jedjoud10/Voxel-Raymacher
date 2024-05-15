@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Voxel {
         int texture;
-        public static int size = 128;
+        public static int size = 512;
         public static int levels = Math.Min(Int32.Log2(size), 7);
         long[] handles;
         Compute generation;

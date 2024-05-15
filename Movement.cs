@@ -14,13 +14,13 @@ namespace Test123Bruh {
         public Matrix4 projMatrix;
         public Matrix4 viewMatrix;
         Vector2 mousePosTest;
-        bool grabbed = true;
-
-        public void Update(MouseState mouse, KeyboardState keyboard, float ratio, float delta) {
+        
+        // Moves the player position and handles rotation
+        public void Move(MouseState mouse, KeyboardState keyboard, float delta) {
+            mousePosTest += mouse.Delta * 0.0005f;
             rotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
 
             Vector3 forward = Vector3.Transform(-Vector3.UnitZ, rotation);
-            Vector3 up = Vector3.Transform(Vector3.UnitY, rotation);
             Vector3 side = Vector3.Transform(Vector3.UnitX, rotation);
 
             // Update position and rotation
@@ -37,8 +37,10 @@ namespace Test123Bruh {
             } else if (keyboard.IsKeyDown(Keys.D)) {
                 position += side * speed * delta;
             }
+        }
 
-            // Create a rotation and position matrix based on current rotation and position
+        // Create a rotation and position matrix based on current rotation and position
+        public void UpdateMatrices(float ratio) {
             viewMatrix = Matrix4.CreateFromQuaternion(rotation);
             projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(70.0f), ratio, 0.1f, 1000.0f);
         }

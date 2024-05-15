@@ -15,15 +15,19 @@ namespace Test123Bruh {
     internal class Game : GameWindow {
         int fbo;
         int screenTexture;
-        int scaleDown = 2;
+        int scaleDownFactor = 1;
         Compute compute = null;
         ImGuiController controller = null;
         Voxel voxel = null;
         Movement movement = null;
         
-        int max_level_iter = Voxel.levels-1;
-        int max_iter = 128;
-        int debug_view = 0;
+        int maxLevelIter = Voxel.levels-1;
+        int maxIter = 128;
+        int maxReflections = 1;
+        int debugView = 0;
+        bool useSubVoxels = false;
+        ulong frameCount = 0;
+        float[] frameGraphData = new float[128];
         
         private static void OnDebugMessage(
             DebugSource source,     // Source of the debugging message.
@@ -46,6 +50,7 @@ namespace Test123Bruh {
 
         protected override void OnLoad() {
             base.OnLoad();
+            CursorState = CursorState.Grabbed;
 
             GL.DebugMessageCallback(OnDebugMessage, 0);
             GL.Enable(EnableCap.DebugOutput);
@@ -88,6 +93,7 @@ namespace Test123Bruh {
             controller.MouseScroll(e.Offset);
         }
 
+        // Capture a screenshot and save to a folder next to the executable
         private void Screenshot() {
             string execPath = System.Reflection.Assembly.GetEntryAssembly().Location;
             execPath = Path.GetDirectoryName(execPath);
@@ -107,20 +113,26 @@ namespace Test123Bruh {
             bitmap.Save(ssPath, ImageFormat.Jpeg);
         }
 
+        // Render ImGui Stuff!!!
         private void ImGuiDebug(float delta) {
-            // Render ImGui Stuff!!!
             bool t = true;
             ImGui.Begin("Voxel Raymarcher Test Window!", ref t, ImGuiWindowFlags.MenuBar);
             ImGui.Text("Frame timings: " + delta + ", FPS: " + (1.0 / delta));
             ImGui.Text("F5: Toggle Fullscreen");
             ImGui.Text("F4: Toggle Normal/Grabbed Mouse");
             ImGui.Text("F3: Take screenshot and save it as Jpeg");
-            ImGui.ListBox("Debug View Type", ref debug_view, new string[] {
+            ImGui.ListBox("Debug View Type", ref debugView, new string[] {
                 "Non-Debug", "Map intersection normal", "Total iterations",
                 "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals" }, 7);
-            ImGui.SliderInt("Max Iters", ref max_iter, 0, 512);
-            ImGui.SliderInt("Starting Mip-chain Depth", ref max_level_iter, 0, Voxel.levels - 1);
-            ImGui.End();
+            ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
+            ImGui.PlotLines("Time Graph", ref frameGraphData[0], 128);
+            ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
+            ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 4);
+            ImGui.ListBox("Resolution Scale-down Factor", ref scaleDownFactor, new string[] {
+                "1x (Native)", "2x", "4x",
+                "8x" }, 4);
+            ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
+            ImGui.End();            
 
             //ImGui.DockSpaceOverViewport();
             //ImGui.ShowDemoWindow();
@@ -128,16 +140,20 @@ namespace Test123Bruh {
 
         protected override void OnRenderFrame(FrameEventArgs args) {
             base.OnRenderFrame(args);
-
+            frameCount += 1;
             float delta = (float)args.Time;
+            frameGraphData[frameCount % 128] = delta;
+
             controller.Update(this, delta);
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             GL.ClearColor(new Color4(0, 32, 48, 255));
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit | ClearBufferMask.StencilBufferBit);
 
+            // Player movement and matrices
             if (CursorState == CursorState.Grabbed) {
-                movement.Update(MouseState, KeyboardState, (float)ClientSize.Y / (float)ClientSize.X, delta);
+                movement.Move(MouseState, KeyboardState, delta);
             }
+            movement.UpdateMatrices((float)ClientSize.Y / (float)ClientSize.X);
             
             // Fullscreen toggle 
             if (KeyboardState.IsKeyPressed(Keys.F5)) {
@@ -151,15 +167,18 @@ namespace Test123Bruh {
 
             // Bind compute shader and execute it
             GL.UseProgram(compute.program);
+            int scaleDown = 1 << scaleDownFactor;
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             GL.ProgramUniform2(compute.program, 1, ClientSize.ToVector2() / scaleDown);
             GL.ProgramUniformMatrix4(compute.program, 2, false, ref movement.viewMatrix);
             GL.ProgramUniformMatrix4(compute.program, 3, false, ref movement.projMatrix);
             GL.ProgramUniform3(compute.program, 4, movement.position);
-            GL.ProgramUniform1(compute.program, 5, max_level_iter);
-            GL.ProgramUniform1(compute.program, 6, max_iter);
+            GL.ProgramUniform1(compute.program, 5, maxLevelIter);
+            GL.ProgramUniform1(compute.program, 6, maxIter);
             GL.ProgramUniform1(compute.program, 7, Voxel.size);
-            GL.ProgramUniform1(compute.program, 8, debug_view);
+            GL.ProgramUniform1(compute.program, 8, debugView);
+            GL.ProgramUniform1(compute.program, 9, maxReflections);
+            GL.ProgramUniform1(compute.program, 10, useSubVoxels ? 1 : 0);
             voxel.Bind(compute.program);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
