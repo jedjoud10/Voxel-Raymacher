@@ -10,13 +10,15 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Skybox {
         public int texture;
-        public static int size = 64;
+        public static int size = 32;
         Compute generation;
 
         public Skybox() {
             texture = GL.GenTexture();
             GL.BindTexture(TextureTarget.TextureCubeMap, texture);
             GL.TextureStorage2D(texture, 1, SizedInternalFormat.Rgba8, size, size);
+            GL.TextureParameter(texture, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TextureParameter(texture, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Nearest);
 
             generation = new Compute("Skybox.glsl");
             GL.UseProgram(generation.program);

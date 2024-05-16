@@ -8,13 +8,19 @@ layout(location = 2) uniform int resolution;
 layout(location = 3) uniform int side;
 
 void main() {
-    // Convert coordinates to -1 - 1 coordinates
+    // convert coordinates to -1 - 1 coordinates
     vec2 coords = vec2(gl_GlobalInvocationID.xy);
     vec3 ndc = vec3(coords.x / resolution, coords.y / resolution, 1);
     ndc.xy = ndc.xy * 2 - 1;
 
-    // Convert the NDC coordinate to a world space normal 
+    // convert the NDC coordinate to a world space normal 
     vec3 normal = normalize((proj_view_matrix * vec4(ndc, 0)).xyz);
 
-	imageStore(skybox, ivec3(gl_GlobalInvocationID.xy, side), vec4(normal, 0.0));
+    // some very cool lighting calculations
+    vec3 light_blue = vec3(191, 230, 255) / 255.0;
+    vec3 dark_blue = vec3(99, 194, 255) / 255.0;
+    vec3 color = mix(light_blue, dark_blue, normal.y);
+    //color = mix(color, vec3(0.1), clamp(-normal.y*30-0.,0,1));
+
+	imageStore(skybox, ivec3(gl_GlobalInvocationID.xy, side), vec4(color, 0.0));
 }

@@ -29,6 +29,7 @@ namespace Test123Bruh {
         int debugView = 0;
         bool useSubVoxels = false;
         ulong frameCount = 0;
+        Vector3 lightDirection = new Vector3(1f, 1f, 1f);
         float[] frameGraphData = new float[128];
         
         private static void OnDebugMessage(
@@ -131,7 +132,7 @@ namespace Test123Bruh {
             ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 128);
             ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
-            ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 4);
+            ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
             ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 1.0f);
             ImGui.ListBox("Resolution Scale-down Factor", ref scaleDownFactor, new string[] {
                 "1x (Native)", "2x", "4x",
@@ -139,6 +140,12 @@ namespace Test123Bruh {
             ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
             ImGui.Text("Map Size: " + Voxel.size);
             ImGui.Text("Map Max Levels: " + Voxel.levels);
+
+            System.Numerics.Vector3 v = new System.Numerics.Vector3(lightDirection.X, lightDirection.Y, lightDirection.Z);
+            ImGui.SliderFloat3("Sun direction", ref v, -1f, 1f);
+            lightDirection.X = v.X;
+            lightDirection.Y = v.Y;
+            lightDirection.Z = v.Z;
             ImGui.End();            
 
             //ImGui.DockSpaceOverViewport();
@@ -187,6 +194,7 @@ namespace Test123Bruh {
             GL.ProgramUniform1(compute.program, 9, maxReflections);
             GL.ProgramUniform1(compute.program, 10, useSubVoxels ? 1 : 0);
             GL.ProgramUniform1(compute.program, 11, reflectionRoughness);
+            GL.ProgramUniform3(compute.program, 12, lightDirection.Normalized());
             voxel.Bind(1);
 
             GL.BindTextureUnit(2, skybox.texture);

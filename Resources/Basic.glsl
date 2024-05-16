@@ -1,4 +1,5 @@
-﻿#version 460
+﻿
+#version 460
 #extension GL_ARB_gpu_shader_int64 : enable
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(rgba8, binding = 0, location = 0) uniform image2D image;
@@ -13,6 +14,7 @@ layout(location = 8) uniform int debug_view;
 layout(location = 9) uniform int max_reflections;
 layout(location = 10) uniform int use_sub_voxels;
 layout(location = 11) uniform float reflection_roughness;
+layout(location = 12) uniform vec3 light_dir;
 layout(rg32ui, binding = 1) uniform uimage3D voxels[7];
 layout(binding = 2) uniform samplerCube skybox;
 
@@ -20,13 +22,11 @@ layout(binding = 2) uniform samplerCube skybox;
 #include Lighting.glsl
 
 // 3d cube vs ray intersection that allows us to calculate closest distance to face of cube
-vec2 intersection(vec3 pos, vec3 dir, vec3 smol, vec3 beig, inout int max_dir, inout int min_dir) {
+vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig, inout int max_dir, inout int min_dir) {
 	float tmin = 0.0, tmax = 1000000.0;
-	vec3 dir_inv = 1.0 / (dir + vec3(0.001));
-
 	for (int d = 0; d < 3; d++) {
-		float t1 = (smol[d] - pos[d]) * dir_inv[d];
-		float t2 = (beig[d] - pos[d]) * dir_inv[d];
+		float t1 = (smol[d] - pos[d]) * inv_dir[d];
+		float t2 = (beig[d] - pos[d]) * inv_dir[d];
 
 		float aaa = min(t1, t2);
 		float eee = max(t1, t2);
@@ -43,12 +43,12 @@ vec2 intersection(vec3 pos, vec3 dir, vec3 smol, vec3 beig, inout int max_dir, i
 
 	/*
 	for (int d = 0; d < 3; d++) {
-		bool sign = sign(dir_inv[d]) == 1.0;
+		bool sign = sign(inv_dir[d]) == 1.0;
 		float bmin = vertices[int(sign)][d];
 		float bmax = vertices[int(!sign)][d];
 
-		float dmin = (bmin - position[d]) * dir_inv[d];
-		float dmax = (bmax - position[d]) * dir_inv[d];
+		float dmin = (bmin - position[d]) * inv_dir[d];
+		float dmax = (bmax - position[d]) * inv_dir[d];
 
 		tmin = max(dmin, tmin);
 		tmax = min(dmax, tmax);
@@ -87,7 +87,7 @@ vec3 get_internal_box_normal(int side, vec3 ray_dir) {
 }
 
 // recrusviely go through the mip chain
-void recurse(vec3 pos, vec3 ray_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout vec3 normal) {
+void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout vec3 normal) {
 	// recursively iterate through the mip maps (starting at the highest level)
 	// check each level for big empty spaces that we can skip over
 	for (int j = max_mip_iter; j >= 0; j--) {
@@ -98,12 +98,9 @@ void recurse(vec3 pos, vec3 ray_dir, inout bool hit, inout float voxel_distance,
 		// calculate temporary distance to the end of the current cell for the current mipmap
 		int a = 0;
 		int b = 0;
-		vec2 distances = intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(scale_factor), a, b);
+		vec2 distances = intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(scale_factor), a, b);
 		float t_voxel_distance = distances.y - distances.x;
-
-		// modulo scale for repeating the maps
-		vec3 modulo_scale = vec3(map_size / scale_factor, 100000, map_size / scale_factor);
-		ivec3 tex_point = ivec3(floor(mod(pos / scale_factor, modulo_scale)));
+		ivec3 tex_point = ivec3(floor(pos / scale_factor));
 
 		if (imageLoad(voxels[j], tex_point).x == 0) {
 			voxel_distance = t_voxel_distance;
@@ -112,7 +109,7 @@ void recurse(vec3 pos, vec3 ray_dir, inout bool hit, inout float voxel_distance,
 
 			int min_side_hit = 0;
 			int max_side_hit = 0;
-			intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(scale_factor), min_side_hit, max_side_hit);
+			intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(scale_factor), min_side_hit, max_side_hit);
 			normal = get_internal_box_normal(max_side_hit, ray_dir);
 
 			break;
@@ -121,23 +118,24 @@ void recurse(vec3 pos, vec3 ray_dir, inout bool hit, inout float voxel_distance,
 }
 
 // trace WITHIN the voxel!!! (I love bitwise ops)
-void trace_internal(inout vec3 pos, vec3 ray_dir, inout float voxel_distance, inout bool hit, inout vec3 normal, inout float bit_fetches) {
+void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxel_distance, inout bool hit, inout vec3 normal, inout float bit_fetches) {
 	uint64_t inner_bits = get_binary_data(pos);
 	vec3 min_pos = floor(pos);
 	vec3 max_pos = ceil(pos);
 
+	//vec3 intputu = floor(pos * 4) - floor(pos) * 4;
 	for (int i = 0; i < 6; i++) {
 		vec3 grid_level_point = floor(pos / 0.25) * 0.25;
 		bit_fetches += 1.0;
 		int min_side_hit = 0;
 		int max_side_hit = 0;
-		vec2 distances = intersection(pos, ray_dir, grid_level_point, grid_level_point + vec3(0.25), min_side_hit, max_side_hit);
+		vec2 distances = intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(0.25), min_side_hit, max_side_hit);
 		voxel_distance = distances.y - distances.x;
 
 		if (check_inner_bits(pos, inner_bits)) {
 			// TODO: Find a way to avoid an intersection thingy here
 			//pos = clamp(pos, grid_level_point + 0.1, vec3(0.24));
-			intersection(pos, -ray_dir, grid_level_point, grid_level_point + vec3(0.25), min_side_hit, max_side_hit);
+			intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(0.25), min_side_hit, max_side_hit);
 
 			// TODO: Fix weird normals on sub voxel faces
 			normal = get_internal_box_normal(max_side_hit, ray_dir);
@@ -151,6 +149,14 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, inout float voxel_distance, in
 		}
 	}
 
+	/*
+	vec3 outputu = floor(pos * 4) - floor(pos) * 4;
+
+	if (outputu.x == intputu.x && outputu.y == intputu.y) {
+		bit_fetches += 1.0;
+	}
+	*/
+
 	hit = false;
 }
 
@@ -163,6 +169,7 @@ void main() {
 	// apply projection transformations for ray dir
 	vec3 ray_dir = (view_matrix * proj_matrix * vec4(coords, 1, 0)).xyz;
 	ray_dir = normalize(ray_dir);
+	vec3 inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 
 	// ray marching stuff
 	vec3 pos = position;
@@ -190,17 +197,17 @@ void main() {
 		}
 
 		// recursively go through the mip chain
-		recurse(pos, ray_dir, temp_hit, voxel_distance, min_level_reached, normal);
+		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, normal);
 
 		// gotta add a small offset since we'd be on the very face of the voxel
-		pos += ray_dir * (0.001 + voxel_distance);
-		
+		pos += ray_dir * max(0.001, voxel_distance);
+
 		// do all of our lighting calculations here
 		if (temp_hit) {
 			temp_hit = false;
 
 			if (use_sub_voxels == 1) {
-				trace_internal(pos, ray_dir, voxel_distance, temp_hit, normal, total_inner_bit_fetches);
+				trace_internal(pos, ray_dir, inv_dir, voxel_distance, temp_hit, normal, total_inner_bit_fetches);
 			}
 
 			if (temp_hit || use_sub_voxels == 0) {
@@ -210,6 +217,7 @@ void main() {
 						ray_dir = reflect(ray_dir, normal);
 						ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
 						ray_dir = normalize(ray_dir);
+						inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 
 						pos += ray_dir * 0.01;
 						reflections_iters += 1;
@@ -230,20 +238,20 @@ void main() {
 	}
 
 	// ACTUAL GAME VIEW
-	if (debug_view == 0) {	
+	if (debug_view == 0) {
 		float factor = float(reflections_iters) / float(max(max_reflections, 1));
 
 		if (!hit) {
 			color = sky(ray_dir);
 		}
 
-		color *= (1 - factor) * 0.2 + 0.8;
+		color *= pow((1 - factor), 0.5) * 0.4 + 0.6;
 	}
-	
+
 	else if (debug_view == 1) {
 		int min_dir = 0;
 		int max_dir = 0;
-		vec2 dists = intersection(pos, ray_dir, vec3(0), vec3(map_size), min_dir, max_dir);
+		vec2 dists = intersection(pos, ray_dir, inv_dir, vec3(0), vec3(map_size), min_dir, max_dir);
 		color = get_internal_box_normal(max_dir, ray_dir);
 	}
 	else if (debug_view == 2) {
