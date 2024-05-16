@@ -25,7 +25,7 @@ namespace Test123Bruh {
         int maxLevelIter = Voxel.levels-1;
         int maxIter = 128;
         int maxReflections = 1;
-        float reflectionRoughness = 0.2f;
+        float reflectionRoughness = 0.02f;
         int debugView = 0;
         bool useSubVoxels = false;
         ulong frameCount = 0;
@@ -133,7 +133,7 @@ namespace Test123Bruh {
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 128);
             ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
             ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
-            ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 1.0f);
+            ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 0.4f);
             ImGui.ListBox("Resolution Scale-down Factor", ref scaleDownFactor, new string[] {
                 "1x (Native)", "2x", "4x",
                 "8x" }, 4);

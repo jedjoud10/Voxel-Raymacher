@@ -13,6 +13,7 @@ float sdBox(vec3 p, vec3 b)
 
 bool density(vec3 pos) {
 	float val = pos.y - 30;
+	//val += sin(pos.x)*3f;
 	val += snoise(pos * 0.02 * vec3(1, 0.3, 1)) * 10;
 	val += (1-cellular(pos.xz * 0.03).y) * 20;
 	val += snoise(pos * 0.04 * vec3(1, 4, 1)) * 15 * clamp(snoise(pos * 0.01) * 10, 0, 1);
@@ -29,7 +30,7 @@ bool density(vec3 pos) {
 	val = min(val, boxu);
 	*/
 
-	return round(val) <= 0;
+	return val <= 0;
 }
 
 float hash13(vec3 p3)
@@ -42,7 +43,7 @@ float hash13(vec3 p3)
 
 void main() {
 	uint64_t bitwise_data = uint64_t(0);
-	int block_out = int(density(vec3(gl_GlobalInvocationID)));
+	//int block_out = int(density(vec3(gl_GlobalInvocationID)));
 	for (int x = 0; x < 4; x++)
 	{
 		for (int y = 0; y < 4; y++)
@@ -54,9 +55,11 @@ void main() {
 
 				bitwise_data |= uint64_t(block) << uint64_t(x * 16 + y * 4 + z);
 				
-				//bitwise_data |= uint64_t(block_out) << uint64_t(x * 16 + y * 4 + z);
+				/*
+				bitwise_data |= uint64_t(block_out) << uint64_t(x * 16 + y * 4 + z);
 				if (hash13(pos) > 0.5) {
 				}
+				*/
 			}
 		}
 	}	

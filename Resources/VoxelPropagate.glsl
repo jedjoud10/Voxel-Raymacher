@@ -14,7 +14,7 @@ void main() {
 		{
 			for (int z = 0; z < 2; z++)
 			{
-				vec2 dat = imageLoad(last_voxels, ivec3(gl_GlobalInvocationID * 2) + ivec3(x, y, z)).xy;
+				uvec2 dat = imageLoad(last_voxels, ivec3(gl_GlobalInvocationID * 2) + ivec3(x, y, z)).xy;
 				nice = nice || (dat.x > 0.0 || dat.y > 0.0);
 			}
 		}

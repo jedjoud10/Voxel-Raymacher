@@ -87,9 +87,14 @@ vec3 get_internal_box_normal(int side, vec3 ray_dir) {
 }
 
 // recrusviely go through the mip chain
-void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout vec3 normal) {
+void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout vec3 normal, inout uint level_cache) {
 	// recursively iterate through the mip maps (starting at the highest level)
+	// TODO: don't start iterating at the highest level if we know what direction the ray is going and what the current child history is
+	// basically, we can avoid fetching the low-res textures if we are being smart
+	
 	// check each level for big empty spaces that we can skip over
+
+
 	for (int j = max_mip_iter; j >= 0; j--) {
 		// use the mip maps themselves as an acceleration structure
 		float scale_factor = pow(2, j);
@@ -102,7 +107,25 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 		float t_voxel_distance = distances.y - distances.x;
 		ivec3 tex_point = ivec3(floor(pos / scale_factor));
 
-		if (imageLoad(voxels[j], tex_point).x == 0) {
+		uvec2 daaaa = imageLoad(voxels[j], tex_point).xy;
+		if (daaaa.x == 0 && daaaa.y == 0) {
+			// calculate child offset relative to parent
+			vec3 child_min = grid_level_point;
+			vec3 child_max = grid_level_point + vec3(scale_factor);
+			vec3 center = (child_min + child_max) / 2;
+
+			// get parent node center
+			vec3 parent_min = floor(pos / (scale_factor * 2)) * scale_factor * 2;
+			vec3 parent_max = parent_min + vec3(scale_factor * 2);
+			vec3 parent_center = (parent_min + parent_max) / 2;
+
+			// get local offset dir
+			vec3 local_offset_dir = parent_center - center;
+
+
+			// if dot product between ray_dir and child offset local to parent is negative it means that the next time we iterate we can start at the current level instead of the highest level
+			
+			
 			voxel_distance = t_voxel_distance;
 			hit = false;
 			min_level_reached = min(min_level_reached, j);
@@ -178,6 +201,7 @@ void main() {
 	// vars for default view
 	vec3 color = vec3(0.0);
 	vec3 normal = vec3(0);
+	uint level_cache = 0;
 
 	// debug stuffs
 	float total_iterations = 0.0;
@@ -185,6 +209,7 @@ void main() {
 	float total_inner_bit_fetches = 0.0;
 	float min_level_reached = 1000;
 	int reflections_iters = 0;
+	float factor = 1.0;
 
 	for (int i = 0; i < max_iters; i++) {
 		bool temp_hit = true;
@@ -197,7 +222,7 @@ void main() {
 		}
 
 		// recursively go through the mip chain
-		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, normal);
+		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, normal, level_cache);
 
 		// gotta add a small offset since we'd be on the very face of the voxel
 		pos += ray_dir * max(0.001, voxel_distance);
@@ -218,6 +243,8 @@ void main() {
 						ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
 						ray_dir = normalize(ray_dir);
 						inv_dir = 1.0 / (ray_dir + vec3(0.0001));
+						level_cache = 0;
+						factor /= 2.0;
 
 						pos += ray_dir * 0.01;
 						reflections_iters += 1;
@@ -239,13 +266,11 @@ void main() {
 
 	// ACTUAL GAME VIEW
 	if (debug_view == 0) {
-		float factor = float(reflections_iters) / float(max(max_reflections, 1));
-
 		if (!hit) {
 			color = sky(ray_dir);
 		}
-
-		color *= pow((1 - factor), 0.5) * 0.4 + 0.6;
+		color /= pow(2, max(reflections_iters-1, 0));
+		//color *= pow((1 - factor), 0.5) * 0.4 + 0.6;
 	}
 
 	else if (debug_view == 1) {
