@@ -28,6 +28,7 @@ namespace Test123Bruh {
         float reflectionRoughness = 0.02f;
         int debugView = 0;
         bool useSubVoxels = false;
+        bool useMipchainCacheOpt = false;
         ulong frameCount = 0;
         Vector3 lightDirection = new Vector3(1f, 1f, 1f);
         float[] frameGraphData = new float[128];
@@ -138,8 +139,10 @@ namespace Test123Bruh {
                 "1x (Native)", "2x", "4x",
                 "8x" }, 4);
             ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
+            ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
             ImGui.Text("Map Size: " + Voxel.size);
             ImGui.Text("Map Max Levels: " + Voxel.levels);
+            ImGui.Text("Map Memory Usage: " + (voxel.memoryUsage/(1024*1024)) + "mb");
 
             System.Numerics.Vector3 v = new System.Numerics.Vector3(lightDirection.X, lightDirection.Y, lightDirection.Z);
             ImGui.SliderFloat3("Sun direction", ref v, -1f, 1f);
@@ -195,6 +198,7 @@ namespace Test123Bruh {
             GL.ProgramUniform1(compute.program, 10, useSubVoxels ? 1 : 0);
             GL.ProgramUniform1(compute.program, 11, reflectionRoughness);
             GL.ProgramUniform3(compute.program, 12, lightDirection.Normalized());
+            GL.ProgramUniform1(compute.program, 13, useMipchainCacheOpt ? 1 : 0);
             voxel.Bind(1);
 
             GL.BindTextureUnit(2, skybox.texture);

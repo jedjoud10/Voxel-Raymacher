@@ -15,6 +15,7 @@ layout(location = 9) uniform int max_reflections;
 layout(location = 10) uniform int use_sub_voxels;
 layout(location = 11) uniform float reflection_roughness;
 layout(location = 12) uniform vec3 light_dir;
+layout(location = 13) uniform int use_octree_ray_caching;
 layout(rg32ui, binding = 1) uniform uimage3D voxels[7];
 layout(binding = 2) uniform samplerCube skybox;
 
@@ -94,8 +95,18 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 	
 	// check each level for big empty spaces that we can skip over
 
+	// if bit set to 1, means that we can skip the level
+	// must find the index of the first bit set to 0 (which corresponds to level)
+	// level 0: 512*512*512
+	// level 1: 256*256*256
+	// level 2: 128*128*128
+	int inv_start_level = min(findLSB(level_cache), max_mip_iter);
 
-	for (int j = max_mip_iter; j >= 0; j--) {
+	if (use_octree_ray_caching == 0) {
+		inv_start_level = max_mip_iter;
+	}
+
+	for (int j = inv_start_level; j >= 0; j--) {
 		// use the mip maps themselves as an acceleration structure
 		float scale_factor = pow(2, j);
 		vec3 grid_level_point = floor(pos / scale_factor) * scale_factor;
@@ -107,24 +118,35 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 		float t_voxel_distance = distances.y - distances.x;
 		ivec3 tex_point = ivec3(floor(pos / scale_factor));
 
-		uvec2 daaaa = imageLoad(voxels[j], tex_point).xy;
-		if (daaaa.x == 0 && daaaa.y == 0) {
+		uvec2 data = imageLoad(voxels[j], tex_point).xy;
+		if (all(data == uvec2(0))) {
 			// calculate child offset relative to parent
-			vec3 child_min = grid_level_point;
+			/*
+			vec3 center = grid_level_point;
 			vec3 child_max = grid_level_point + vec3(scale_factor);
 			vec3 center = (child_min + child_max) / 2;
+			*/
+			vec3 center = grid_level_point + vec3(scale_factor) * 0.5;
 
 			// get parent node center
-			vec3 parent_min = floor(pos / (scale_factor * 2)) * scale_factor * 2;
+			vec3 parent_center = floor(pos / (scale_factor * 2)) * scale_factor * 2 + vec3(scale_factor);
+			/*
 			vec3 parent_max = parent_min + vec3(scale_factor * 2);
 			vec3 parent_center = (parent_min + parent_max) / 2;
+			*/
 
 			// get local offset dir
 			vec3 local_offset_dir = parent_center - center;
-
+			//normal += local_offset_dir;
 
 			// if dot product between ray_dir and child offset local to parent is negative it means that the next time we iterate we can start at the current level instead of the highest level
-			
+			uint bwuh = uint(1) << uint(j);
+			if (dot(local_offset_dir, ray_dir) < 0.0) {
+				level_cache |= bwuh;
+			}
+			else {
+				level_cache &= ~bwuh;
+			}
 			
 			voxel_distance = t_voxel_distance;
 			hit = false;
@@ -201,7 +223,7 @@ void main() {
 	// vars for default view
 	vec3 color = vec3(0.0);
 	vec3 normal = vec3(0);
-	uint level_cache = 0;
+	uint level_cache = 8;
 
 	// debug stuffs
 	float total_iterations = 0.0;
@@ -236,7 +258,7 @@ void main() {
 			}
 
 			if (temp_hit || use_sub_voxels == 0) {
-				if (pos.x < 33) {
+				if (pos.y < 33) {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
 						ray_dir = reflect(ray_dir, normal);
@@ -286,13 +308,14 @@ void main() {
 		color = vec3(min_level_reached / float(max_mip_iter));
 	}
 	else if (debug_view == 4) {
-		color = vec3(total_inner_bit_fetches / float(20));
+		color = vec3(total_inner_bit_fetches / float(60));
 	}
 	else if (debug_view == 5) {
 		color = vec3(float(reflections_iters) / float(max_reflections));
 	}
 	else if (debug_view == 6) {
-		color = normal;
+		normal = normalize(normal);
+		color = normal;		
 	}
 
 	// store the value in the image that we will blit

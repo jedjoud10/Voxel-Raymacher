@@ -10,8 +10,9 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Voxel {
         public int texture;
-        public static int size = 64;
+        public static int size = 256;
         public static int levels = Math.Min(Int32.Log2(size), 7);
+        public int memoryUsage = 0;
         Compute generation;
         Compute propagate;
 
@@ -73,6 +74,7 @@ namespace Test123Bruh {
             int testSize = size;
             for (int i = 0; i < levels; i++) {
                 //GL.Ext.TexturePageCommitment(texture, i, 0, 0, 0, testSize, testSize, testSize, true);
+                memoryUsage += size * size * size * 4 * 2;
                 testSize /= 2;
                 testSize = Math.Max(testSize, 1);
             }

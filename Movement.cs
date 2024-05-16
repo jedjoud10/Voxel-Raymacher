@@ -24,7 +24,7 @@ namespace Test123Bruh {
             Vector3 side = Vector3.Transform(Vector3.UnitX, rotation);
 
             // Update position and rotation
-            float speed = keyboard.IsKeyDown(Keys.LeftControl) ? 5.0f : 30.0f;
+            float speed = keyboard.IsKeyDown(Keys.LeftControl) ? 1.0f : 30.0f;
 
             if (keyboard.IsKeyDown(Keys.W)) {
                 position += forward * speed * delta;
@@ -42,7 +42,7 @@ namespace Test123Bruh {
         // Create a rotation and position matrix based on current rotation and position
         public void UpdateMatrices(float ratio) {
             viewMatrix = Matrix4.CreateFromQuaternion(rotation);
-            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(70.0f), ratio, 0.1f, 1000.0f);
+            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(80.0f), ratio, 0.1f, 1000.0f);
         }
     }
 }
