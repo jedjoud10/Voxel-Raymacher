@@ -13,13 +13,15 @@ float sdBox(vec3 p, vec3 b)
 
 bool density(vec3 pos) {
 	float val = pos.y - 30;
-	//val += sin(pos.x)*3f;
+	val += sin(pos.x * 0.2)*3;
+	/*
 	val += snoise(pos * 0.02 * vec3(1, 0.3, 1)) * 10;
 	val += (1-cellular(pos.xz * 0.03).y) * 20;
 	val += snoise(pos * 0.04 * vec3(1, 4, 1)) * 15 * clamp(snoise(pos * 0.01) * 10, 0, 1);
 	val = min(val-10, pos.y - 32);
 	val += snoise(pos * 0.3) * 0.2;
 	val += clamp(snoise(pos * 0.01) * 30 - 10, 0, 15) * 3;
+	*/
 	//val = max(val, pos.y - 50);
 	//val -= (1 - abs(snoise(pos * 0.02 * vec3(1, 2, 1)))) * 20;
 	//val += abs(snoise(pos * 0.04 * vec3(1, 3, 1))) * 10;

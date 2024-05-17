@@ -258,7 +258,7 @@ void main() {
 			}
 
 			if (temp_hit || use_sub_voxels == 0) {
-				if (pos.y < 33) {
+				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
 						ray_dir = reflect(ray_dir, normal);

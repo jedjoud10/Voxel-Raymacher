@@ -31,7 +31,7 @@ namespace Test123Bruh {
         bool useMipchainCacheOpt = false;
         ulong frameCount = 0;
         Vector3 lightDirection = new Vector3(1f, 1f, 1f);
-        float[] frameGraphData = new float[128];
+        float[] frameGraphData = new float[512];
         
         private static void OnDebugMessage(
             DebugSource source,     // Source of the debugging message.
@@ -131,7 +131,7 @@ namespace Test123Bruh {
                 "Non-Debug", "Map intersection normal", "Total iterations",
                 "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals" }, 7);
             ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
-            ImGui.PlotLines("Time Graph", ref frameGraphData[0], 128);
+            ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
             ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
             ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
             ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 0.4f);
@@ -159,7 +159,7 @@ namespace Test123Bruh {
             base.OnRenderFrame(args);
             frameCount += 1;
             float delta = (float)args.Time;
-            frameGraphData[frameCount % 128] = delta;
+            frameGraphData[frameCount % 512] = delta;
 
             controller.Update(this, delta);
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);

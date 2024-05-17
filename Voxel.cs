@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Voxel {
         public int texture;
-        public static int size = 256;
+        public static int size = 64;
         public static int levels = Math.Min(Int32.Log2(size), 7);
         public int memoryUsage = 0;
         Compute generation;
@@ -25,7 +25,7 @@ namespace Test123Bruh {
          * Temporal depth reprojection from last frame (use it as "starting point" for iter)
          * AABB tree
          * Use bitwise stuff for acceleration levels
-         * Keep history of local child indices of un-hit child to avoid retracing from the top
+         * Keep history of local child indices of un-hit child to avoid retracing from the top (DONE)
         */
 
         public Voxel() {
@@ -91,6 +91,8 @@ namespace Test123Bruh {
             for (int i = 0; i < levels-1; i++) {
                 GL.BindImageTexture(0, texture, i, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.Rg32ui);
                 GL.BindImageTexture(1, texture, i+1, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rg32ui);
+                GL.Uniform1(2, (i != 0) ? 1 : 0);
+                //GL.Uniform1(2, size / testSize);
                 testSize /= 2;
                 testSize = Math.Max(testSize, 1);
 
