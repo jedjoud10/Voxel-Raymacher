@@ -24,6 +24,35 @@ layout(binding = 2) uniform samplerCube skybox;
 #include Lighting.glsl
 
 // 3d cube vs ray intersection that allows us to calculate closest distance to face of cube
+// https://tavianator.com/2022/ray_box_boundary.html :3
+vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig) {
+	float tmin = 0.0, tmax = 1000000.0;
+	for (int d = 0; d < 3; d++) {
+		float t1 = (smol[d] - pos[d]) * inv_dir[d];
+		float t2 = (beig[d] - pos[d]) * inv_dir[d];
+
+		tmin = max(tmin, min(t1, t2));
+		tmax = min(tmax, max(t1, t2));
+	}
+
+	/*
+	for (int d = 0; d < 3; d++) {
+		bool sign = sign(inv_dir[d]) == 1.0;
+		float bmin = vertices[int(sign)][d];
+		float bmax = vertices[int(!sign)][d];
+
+		float dmin = (bmin - position[d]) * inv_dir[d];
+		float dmax = (bmax - position[d]) * inv_dir[d];
+
+		tmin = max(dmin, tmin);
+		tmax = min(dmax, tmax);
+	}
+	*/
+
+	return vec2(tmin, tmax);
+}
+
+// same one but with directions
 vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig, inout int max_dir, inout int min_dir) {
 	float tmin = 0.0, tmax = 1000000.0;
 	for (int d = 0; d < 3; d++) {
@@ -42,20 +71,6 @@ vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig, inout 
 			min_dir = d;
 		}
 	}
-
-	/*
-	for (int d = 0; d < 3; d++) {
-		bool sign = sign(inv_dir[d]) == 1.0;
-		float bmin = vertices[int(sign)][d];
-		float bmax = vertices[int(!sign)][d];
-
-		float dmin = (bmin - position[d]) * inv_dir[d];
-		float dmax = (bmax - position[d]) * inv_dir[d];
-
-		tmin = max(dmin, tmin);
-		tmax = min(dmax, tmax);
-	}
-	*/
 
 	return vec2(tmin, tmax);
 }
@@ -89,7 +104,7 @@ vec3 get_internal_box_normal(int side, vec3 ray_dir) {
 }
 
 // recrusviely go through the mip chain
-void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout vec3 normal, inout uint level_cache) {
+void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout uint level_cache) {
 	// recursively iterate through the mip maps (starting at the highest level)
 	// TODO: don't start iterating at the highest level if we know what direction the ray is going and what the current child history is
 	// basically, we can avoid fetching the low-res textures if we are being smart
@@ -115,11 +130,8 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 		vec3 bounds_max = bounds_min + vec3(scale_factor);
 
 		// calculate temporary distance to the end of the current cell for the current mipmap
-		int a = 0;
-		int b = 0;
-		vec2 distances = intersection(pos, ray_dir, inv_dir, bounds_min, bounds_max, a, b);
-		float t_voxel_distance = distances.y;
-		min_level_reached += 1;
+		vec2 distances = intersection(pos, ray_dir, inv_dir, bounds_min, bounds_max);
+		float inside_node_closest_dist = distances.y;
 
 		// instead of using the bounds directly, use the propagated aabb for tighter culling
 		ivec3 tex_point = ivec3(floor(pos / scale_factor));
@@ -129,14 +141,26 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 			uint mauint = data.y;
 			uvec3 last_min = uvec3(mint & 0x3FF, (mint >> 10) & 0x3FF, (mint >> 20) & 0x3FF);
 			uvec3 last_max = uvec3(mauint & 0x3FF, (mauint >> 10) & 0x3FF, (mauint >> 20) & 0x3FF);
-			vec2 bounds_distances = intersection(pos, ray_dir, inv_dir, vec3(last_min), vec3(last_max), a, b);
+			vec2 bounds_distances = intersection(pos, ray_dir, inv_dir, vec3(last_min), vec3(last_max+1));
 			
-			/*
-			if (bounds_distances.x < bounds_distances.y) {
-				float t_voxel_distance_2 = bounds_distances.x;
-				t_voxel_distance = min(t_voxel_distance_2, t_voxel_distance);
+			// check if we hit the aabb
+			float bounds_closest_dist = bounds_distances.x;
+			if (bounds_distances.y > bounds_distances.x) {
+				// check if we're outside the aabb 
+				if (bounds_distances.x > 0) {
+					voxel_distance = bounds_closest_dist;
+					min_level_reached += 1;
+					hit = false;
+					break;
+				}
 			}
-			*/
+			else {
+				// if we didn't hit the aabb then we don't need to iterate all the lower levels, skip the whole node lel
+				voxel_distance = inside_node_closest_dist;
+				min_level_reached += 1;
+				hit = false;
+				break;
+			}
 		}
 
 		// skip over big areas!!!
@@ -170,17 +194,9 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 				level_cache &= ~bwuh;
 			}
 			
-			voxel_distance = t_voxel_distance;
+			voxel_distance = inside_node_closest_dist;
 			hit = false;
 			//min_level_reached = min(min_level_reached, j);
-
-			int min_side_hit = 0;
-			int max_side_hit = 0;
-
-			if (use_sub_voxels == 0) {
-				intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(scale_factor), min_side_hit, max_side_hit);
-				normal = get_internal_box_normal(max_side_hit, ray_dir);
-			}
 
 			break;
 		}
@@ -188,7 +204,7 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 }
 
 // trace WITHIN the voxel!!! (I love bitwise ops)
-void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxel_distance, inout bool hit, inout vec3 normal, inout float bit_fetches) {
+void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxel_distance, inout bool hit, inout float bit_fetches) {
 	uint64_t inner_bits = get_binary_data(pos);
 	vec3 min_pos = floor(pos);
 	vec3 max_pos = ceil(pos);
@@ -203,12 +219,6 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxe
 		voxel_distance = distances.y - distances.x;
 
 		if (check_inner_bits(pos, inner_bits)) {
-			// TODO: Find a way to avoid an intersection thingy here
-			//pos = clamp(pos, grid_level_point + 0.1, vec3(0.24));
-			intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(0.25), min_side_hit, max_side_hit);
-
-			// TODO: Fix weird normals on sub voxel faces
-			normal = get_internal_box_normal(max_side_hit, ray_dir);
 			hit = true;
 			return;
 		}
@@ -269,7 +279,7 @@ void main() {
 		}
 
 		// recursively go through the mip chain
-		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, normal, level_cache);
+		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, level_cache);
 
 		// gotta add a small offset since we'd be on the very face of the voxel
 		pos += ray_dir * max(0.001, voxel_distance);
@@ -279,7 +289,7 @@ void main() {
 			temp_hit = false;
 
 			if (use_sub_voxels == 1) {
-				trace_internal(pos, ray_dir, inv_dir, voxel_distance, temp_hit, normal, total_inner_bit_fetches);
+				trace_internal(pos, ray_dir, inv_dir, voxel_distance, temp_hit, total_inner_bit_fetches);
 			}
 
 			if (temp_hit || use_sub_voxels == 0) {
@@ -306,6 +316,15 @@ void main() {
 				}
 				*/
 
+				// Find normal using another intersection test
+				int min_side_hit = 0;
+				int max_side_hit = 0;
+				pos += ray_dir * 0.01;
+				float scale = (use_sub_voxels == 1) ? 0.25 : 1;
+				vec3 grid_level_point = floor(pos / scale) * scale;
+				intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
+				normal = get_internal_box_normal(max_side_hit, ray_dir);
+
 				color = lighting(pos, normal, ray_dir);
 				hit = true;
 				break;
@@ -327,8 +346,11 @@ void main() {
 		int max_dir = 0;
 		vec2 dists = intersection(pos, ray_dir, inv_dir, vec3(0), vec3(10), min_dir, max_dir);
 		//color = get_internal_box_normal(max_dir, ray_dir);
-		if (dists.y > dists.x) {
+		if (dists.y > dists.x && dists.x > 0) {
 			color = vec3(dists.x);
+		}
+		else {
+			color = vec3(0.1);
 		}
 		//color = vec3(dists.y - dists.x);
 	}
