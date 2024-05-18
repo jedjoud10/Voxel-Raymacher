@@ -23,7 +23,9 @@ namespace Test123Bruh {
          * 
          * Speed optimizations:
          * Temporal depth reprojection from last frame (use it as "starting point" for iter)
-         * AABB tree (WIP)
+         * AABB tree for node sizes 1 and larger (DONE)
+         * AABB Bounds for sub-voxels, pre-calculated for EVERY possible sub-voxel combination. At runtime would just fetch the bounds from a texture maybe?
+            * Bounds are symmetric in someways so we don't need to store *all* information really. Could be really optimized
          * Use bitwise stuff for acceleration levels (nah)
          * Keep history of local child indices of un-hit child to avoid retracing from the top (DONE)
         */

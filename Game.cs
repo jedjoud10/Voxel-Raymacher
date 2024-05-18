@@ -25,6 +25,7 @@ namespace Test123Bruh {
         int maxLevelIter = Voxel.levels-1;
         int maxIter = 128;
         int maxReflections = 1;
+        int maxSubVoxelIter = 6;
         float reflectionRoughness = 0.02f;
         int debugView = 0;
         bool useSubVoxels = false;
@@ -132,6 +133,7 @@ namespace Test123Bruh {
                 "Non-Debug", "Map intersection normal", "Total iterations",
                 "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position", "Local Position", "Sub-voxel Local Position" }, 10);
             ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
+            ImGui.SliderInt("Max Sub-Voxel Iters", ref maxSubVoxelIter, 0, 6);
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
             ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
             ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
@@ -202,6 +204,7 @@ namespace Test123Bruh {
             GL.ProgramUniform3(compute.program, 12, lightDirection.Normalized());
             GL.ProgramUniform1(compute.program, 13, useMipchainCacheOpt ? 1 : 0);
             GL.ProgramUniform1(compute.program, 14, usePropagatedBoundsOpt ? 1 : 0);
+            GL.ProgramUniform1(compute.program, 15, maxSubVoxelIter);
             voxel.Bind(1);
 
             GL.BindTextureUnit(2, skybox.texture);

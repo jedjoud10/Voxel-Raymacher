@@ -17,12 +17,26 @@ layout(location = 11) uniform float reflection_roughness;
 layout(location = 12) uniform vec3 light_dir;
 layout(location = 13) uniform int use_octree_ray_caching;
 layout(location = 14) uniform int use_prop_aabb_bounds;
+layout(location = 15) uniform int max_sub_voxel_iter;
 layout(rg32ui, binding = 1) uniform uimage3D voxels[7];
 layout(binding = 2) uniform samplerCube skybox;
 
 #include Hashes.glsl
 #include Lighting.glsl
 
+/*
+for (int d = 0; d < 3; d++) {
+	bool sign = sign(inv_dir[d]) == 1.0;
+	float bmin = vertices[int(sign)][d];
+	float bmax = vertices[int(!sign)][d];
+
+	float dmin = (bmin - position[d]) * inv_dir[d];
+	float dmax = (bmax - position[d]) * inv_dir[d];
+
+	tmin = max(dmin, tmin);
+	tmax = min(dmax, tmax);
+}
+*/
 // 3d cube vs ray intersection that allows us to calculate closest distance to face of cube
 // https://tavianator.com/2022/ray_box_boundary.html :3
 vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig) {
@@ -34,20 +48,6 @@ vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig) {
 		tmin = max(tmin, min(t1, t2));
 		tmax = min(tmax, max(t1, t2));
 	}
-
-	/*
-	for (int d = 0; d < 3; d++) {
-		bool sign = sign(inv_dir[d]) == 1.0;
-		float bmin = vertices[int(sign)][d];
-		float bmax = vertices[int(!sign)][d];
-
-		float dmin = (bmin - position[d]) * inv_dir[d];
-		float dmax = (bmax - position[d]) * inv_dir[d];
-
-		tmin = max(dmin, tmin);
-		tmax = min(dmax, tmax);
-	}
-	*/
 
 	return vec2(tmin, tmax);
 }
@@ -149,17 +149,15 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 				// check if we're outside the aabb 
 				if (bounds_distances.x > 0) {
 					voxel_distance = bounds_closest_dist;
-					min_level_reached += 1;
 					hit = false;
-					break;
+					return;
 				}
 			}
 			else {
 				// if we didn't hit the aabb then we don't need to iterate all the lower levels, skip the whole node lel
 				voxel_distance = inside_node_closest_dist;
-				min_level_reached += 1;
 				hit = false;
-				break;
+				return;
 			}
 		}
 
@@ -167,23 +165,13 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 		// FIXME: For some reason on my iGPU all(data == uvec2(0)) doesn't compile :3
 		if (data.x == 0 && data.y == 0) {
 			// calculate child offset relative to parent
-			/*
-			vec3 center = grid_level_point;
-			vec3 child_max = grid_level_point + vec3(scale_factor);
-			vec3 center = (child_min + child_max) / 2;
-			*/
 			vec3 center = grid_level_point + vec3(scale_factor) * 0.5;
 
 			// get parent node center
 			vec3 parent_center = floor(pos / (scale_factor * 2)) * scale_factor * 2 + vec3(scale_factor);
-			/*
-			vec3 parent_max = parent_min + vec3(scale_factor * 2);
-			vec3 parent_center = (parent_min + parent_max) / 2;
-			*/
 
 			// get local offset dir
 			vec3 local_offset_dir = parent_center - center;
-			//normal += local_offset_dir;
 
 			// if dot product between ray_dir and child offset local to parent is negative it means that the next time we iterate we can start at the current level instead of the highest level
 			uint bwuh = uint(1) << uint(j);
@@ -196,9 +184,9 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 			
 			voxel_distance = inside_node_closest_dist;
 			hit = false;
-			//min_level_reached = min(min_level_reached, j);
+			min_level_reached = min(min_level_reached, j);
 
-			break;
+			return;
 		}
 	}
 }
@@ -210,7 +198,7 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxe
 	vec3 max_pos = ceil(pos);
 
 	//vec3 intputu = floor(pos * 4) - floor(pos) * 4;
-	for (int i = 0; i < 6; i++) {
+	for (int i = 0; i < max_sub_voxel_iter; i++) {
 		vec3 grid_level_point = floor(pos / 0.25) * 0.25;
 		bit_fetches += 1.0;
 		int min_side_hit = 0;
@@ -264,7 +252,7 @@ void main() {
 	float total_iterations = 0.0;
 	float total_mip_map_iterations = 0.0;
 	float total_inner_bit_fetches = 0.0;
-	float min_level_reached = 0;
+	float min_level_reached = 1000;
 	int reflections_iters = 0;
 	float factor = 1.0;
 
@@ -344,15 +332,8 @@ void main() {
 	else if (debug_view == 1) {
 		int min_dir = 0;
 		int max_dir = 0;
-		vec2 dists = intersection(pos, ray_dir, inv_dir, vec3(0), vec3(10), min_dir, max_dir);
-		//color = get_internal_box_normal(max_dir, ray_dir);
-		if (dists.y > dists.x && dists.x > 0) {
-			color = vec3(dists.x);
-		}
-		else {
-			color = vec3(0.1);
-		}
-		//color = vec3(dists.y - dists.x);
+		vec2 dists = intersection(pos, ray_dir, inv_dir, vec3(0), vec3(map_size), min_dir, max_dir);
+		color = get_internal_box_normal(max_dir, ray_dir);
 	}
 	else if (debug_view == 2) {
 		color = vec3(total_iterations / float(max_iters));
