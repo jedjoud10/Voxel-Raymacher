@@ -10,16 +10,15 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Voxel {
         public int texture;
-        public static int size = 256;
+        public static int size = 64;
         public static int levels = Math.Min(Int32.Log2(size), 7);
-        public int memoryUsage = 0;
+        public ulong memoryUsage = 0;
         Compute generation;
         Compute propagate;
 
         /* Memory Optimizations:
          * Sparse textures (WIP)
          * Maybe lossless compression
-         * Use bitwise stuff for acceleration levels
          * 
          * Speed optimizations:
          * Temporal depth reprojection from last frame (use it as "starting point" for iter)
@@ -78,12 +77,12 @@ namespace Test123Bruh {
             GL.BindTexture(TextureTarget.Texture3D, texture);
             GL.TextureStorage3D(texture, levels, SizedInternalFormat.Rg32ui, size, size, size);
 
-            int testSize = size;
+            ulong memCalcSize = (ulong)size;
             for (int i = 0; i < levels; i++) {
                 //GL.Ext.TexturePageCommitment(texture, i, 0, 0, 0, testSize, testSize, testSize, true);
-                memoryUsage += size * size * size * 4 * 2;
-                testSize /= 2;
-                testSize = Math.Max(testSize, 1);
+                memoryUsage += memCalcSize * memCalcSize * memCalcSize * 4 * 2;
+                memCalcSize /= 2;
+                memCalcSize = Math.Max(memCalcSize, 1);
             }
 
             generation = new Compute("Voxel.glsl");
@@ -93,13 +92,12 @@ namespace Test123Bruh {
             GL.BindImageTexture(0, texture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rg32ui);
             GL.DispatchCompute(size / 4, size / 4, size / 4);
 
-            testSize = size;
+            int testSize = size;
             GL.UseProgram(propagate.program);
             for (int i = 0; i < levels-1; i++) {
                 GL.BindImageTexture(0, texture, i, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.Rg32ui);
                 GL.BindImageTexture(1, texture, i+1, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rg32ui);
                 GL.Uniform1(2, (i != 0) ? 1 : 0);
-                //GL.Uniform1(2, size / testSize);
                 testSize /= 2;
                 testSize = Math.Max(testSize, 1);
 

@@ -83,7 +83,7 @@ uint64_t get_binary_data(vec3 pos) {
 
 // check if the sub-voxel at one position is set to true
 bool check_inner_bits(vec3 pos, uint64_t bits) {
-	uvec3 internal = uvec3(floor(pos * 4) - floor(pos) * 4);
+	uvec3 internal = uvec3(floor(pos * 2) - floor(pos) * 2);
 	uint index = internal.x * 16 + internal.y * 4 + internal.z;
 	return (bits & (uint64_t(1) << index)) != uint64_t(0);
 }
@@ -199,11 +199,11 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxe
 
 	//vec3 intputu = floor(pos * 4) - floor(pos) * 4;
 	for (int i = 0; i < max_sub_voxel_iter; i++) {
-		vec3 grid_level_point = floor(pos / 0.25) * 0.25;
+		vec3 grid_level_point = floor(pos / 0.5) * 0.5;
 		bit_fetches += 1.0;
 		int min_side_hit = 0;
 		int max_side_hit = 0;
-		vec2 distances = intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(0.25), min_side_hit, max_side_hit);
+		vec2 distances = intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(0.5), min_side_hit, max_side_hit);
 		voxel_distance = distances.y - distances.x;
 
 		if (check_inner_bits(pos, inner_bits)) {
@@ -285,12 +285,12 @@ void main() {
 				int min_side_hit = 0;
 				int max_side_hit = 0;
 				pos += ray_dir * 0.001;
-				float scale = (use_sub_voxels == 1) ? 0.25 : 1;
+				float scale = (use_sub_voxels == 1) ? 0.5 : 1;
 				vec3 grid_level_point = floor(pos / scale) * scale;
 				intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
 				normal = get_internal_box_normal(max_side_hit, ray_dir);
 
-
+				/*
 				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
@@ -311,6 +311,7 @@ void main() {
 						break;
 					}
 				}
+				*/
 
 
 				color = lighting(pos, normal, ray_dir);

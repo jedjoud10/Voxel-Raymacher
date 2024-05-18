@@ -10,33 +10,40 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Movement {
         Quaternion rotation;
+        public float smoothing = 20.0f;
         public Vector3 position = new Vector3((float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f);
         public Matrix4 projMatrix;
         public Matrix4 viewMatrix;
+        Vector3 lastVelocity;
         Vector2 mousePosTest;
         
         // Moves the player position and handles rotation
         public void Move(MouseState mouse, KeyboardState keyboard, float delta) {
             mousePosTest += mouse.Delta * 0.0005f;
-            rotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
+            Quaternion newRotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
+            rotation = Quaternion.Slerp(rotation, newRotation, smoothing * delta * 5);
 
             Vector3 forward = Vector3.Transform(-Vector3.UnitZ, rotation);
             Vector3 side = Vector3.Transform(Vector3.UnitX, rotation);
 
             // Update position and rotation
             float speed = keyboard.IsKeyDown(Keys.LeftControl) ? 1.0f : 30.0f;
+            Vector3 velocity = Vector3.Zero;
 
             if (keyboard.IsKeyDown(Keys.W)) {
-                position += forward * speed * delta;
+                velocity += forward;
             } else if (keyboard.IsKeyDown(Keys.S)) {
-                position += -forward * speed * delta;
+                velocity += -forward;
             }
 
             if (keyboard.IsKeyDown(Keys.A)) {
-                position += -side * speed * delta;
+                velocity += -side;
             } else if (keyboard.IsKeyDown(Keys.D)) {
-                position += side * speed * delta;
+                velocity += side;
             }
+
+            lastVelocity = Vector3.Lerp(lastVelocity, velocity * speed, delta * smoothing);
+            position += lastVelocity * delta;
         }
 
         // Create a rotation and position matrix based on current rotation and position
