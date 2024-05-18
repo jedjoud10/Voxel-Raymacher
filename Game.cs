@@ -21,6 +21,7 @@ namespace Test123Bruh {
         Voxel voxel = null;
         Movement movement = null;
         Skybox skybox = null;
+        int lastDepthTemporal;
 
         int maxLevelIter = Voxel.levels-1;
         int maxIter = 128;
@@ -31,9 +32,12 @@ namespace Test123Bruh {
         bool useSubVoxels = false;
         bool useMipchainCacheOpt = false;
         bool usePropagatedBoundsOpt = false;
+        bool useTemporalReproOpt = false;
         ulong frameCount = 0;
         Vector3 lightDirection = new Vector3(1f, 1f, 1f);
         float[] frameGraphData = new float[512];
+        Matrix4 lastFrameViewMatrix = Matrix4.Identity;
+        Vector3 lastPosition = Vector3.Zero;
         
         private static void OnDebugMessage(
             DebugSource source,     // Source of the debugging message.
@@ -54,6 +58,13 @@ namespace Test123Bruh {
         public Game(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings) : base(gameWindowSettings, nativeWindowSettings) {
         }
 
+        private int CreateScreenTex(SizedInternalFormat format) {
+            int tex = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2D, tex);
+            GL.TextureStorage2D(tex, 1, format, ClientSize.X, ClientSize.Y);
+            return tex;
+        }
+
         protected override void OnLoad() {
             base.OnLoad();
             CursorState = CursorState.Grabbed;
@@ -63,9 +74,8 @@ namespace Test123Bruh {
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DebugOutputSynchronous);
 
-            screenTexture = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture2D, screenTexture);
-            GL.TextureStorage2D(screenTexture, 1, SizedInternalFormat.Rgba8, ClientSize.X, ClientSize.Y);
+            screenTexture = CreateScreenTex(SizedInternalFormat.Rgba8);
+            lastDepthTemporal = CreateScreenTex(SizedInternalFormat.R32f);
 
             fbo = GL.GenFramebuffer();
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
@@ -83,9 +93,9 @@ namespace Test123Bruh {
 
             GL.DeleteTexture(screenTexture);
 
-            screenTexture = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture2D, screenTexture);
-            GL.TextureStorage2D(screenTexture, 1, SizedInternalFormat.Rgba8, e.Width, e.Height);
+            screenTexture = CreateScreenTex(SizedInternalFormat.Rgba8);
+            lastDepthTemporal = CreateScreenTex(SizedInternalFormat.R32f);
+
             GL.NamedFramebufferTexture(fbo, FramebufferAttachment.ColorAttachment0, screenTexture, 0);
             GL.Viewport(0, 0, e.Width, e.Height);
             controller.WindowResized(e.Width, e.Height);
@@ -131,10 +141,10 @@ namespace Test123Bruh {
             ImGui.Text("F3: Take screenshot and save it as Jpeg");
             ImGui.ListBox("Debug View Type", ref debugView, new string[] {
                 "Non-Debug", "Map intersection normal", "Total iterations",
-                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position", "Local Position", "Sub-voxel Local Position" }, 10);
+                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position", "Local Position", "Sub-voxel Local Position", "Scene Depth (log)" }, 11);
+            ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
             ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
             ImGui.SliderInt("Max Sub-Voxel Iters", ref maxSubVoxelIter, 0, 6);
-            ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
             ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
             ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
             ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 0.4f);
@@ -144,9 +154,16 @@ namespace Test123Bruh {
             ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
             ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
             ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
+            ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
             ImGui.Text("Map Size: " + Voxel.size);
             ImGui.Text("Map Max Levels: " + Voxel.levels);
             ImGui.Text("Map Memory Usage: " + (voxel.memoryUsage/(1024*1024)) + "mb");
+            if (ImGui.CollapsingHeader("Last Temporal Depth Texture")) {
+                float scaleDownTest = 4.0f;
+                System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(0, 0.5f);
+                System.Numerics.Vector2 uv1 = new System.Numerics.Vector2(1, 0) / 2.0f;
+                ImGui.Image((nint)lastDepthTemporal, new System.Numerics.Vector2(ClientSize.X, ClientSize.Y) / scaleDownTest, uv0, uv1);
+            }
 
             System.Numerics.Vector3 v = new System.Numerics.Vector3(lightDirection.X, lightDirection.Y, lightDirection.Z);
             ImGui.SliderFloat3("Sun direction", ref v, -1f, 1f);
@@ -174,7 +191,7 @@ namespace Test123Bruh {
             if (CursorState == CursorState.Grabbed) {
                 movement.Move(MouseState, KeyboardState, delta);
             }
-            movement.UpdateMatrices((float)ClientSize.Y / (float)ClientSize.X);
+            movement.UpdateMatrices((float)ClientSize.Y / (float)ClientSize.X, useTemporalReproOpt);
             
             // Fullscreen toggle 
             if (KeyboardState.IsKeyPressed(Keys.F5)) {
@@ -189,29 +206,38 @@ namespace Test123Bruh {
             // Bind compute shader and execute it
             GL.UseProgram(compute.program);
             int scaleDown = 1 << scaleDownFactor;
-            GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
-            GL.ProgramUniform2(compute.program, 1, ClientSize.ToVector2() / scaleDown);
-            GL.ProgramUniformMatrix4(compute.program, 2, false, ref movement.viewMatrix);
-            GL.ProgramUniformMatrix4(compute.program, 3, false, ref movement.projMatrix);
-            GL.ProgramUniform3(compute.program, 4, movement.position);
-            GL.ProgramUniform1(compute.program, 5, maxLevelIter);
-            GL.ProgramUniform1(compute.program, 6, maxIter);
-            GL.ProgramUniform1(compute.program, 7, Voxel.size);
-            GL.ProgramUniform1(compute.program, 8, debugView);
-            GL.ProgramUniform1(compute.program, 9, maxReflections);
-            GL.ProgramUniform1(compute.program, 10, useSubVoxels ? 1 : 0);
-            GL.ProgramUniform1(compute.program, 11, reflectionRoughness);
-            GL.ProgramUniform3(compute.program, 12, lightDirection.Normalized());
-            GL.ProgramUniform1(compute.program, 13, useMipchainCacheOpt ? 1 : 0);
-            GL.ProgramUniform1(compute.program, 14, usePropagatedBoundsOpt ? 1 : 0);
-            GL.ProgramUniform1(compute.program, 15, maxSubVoxelIter);
-            voxel.Bind(1);
+            GL.Uniform2(1, ClientSize.ToVector2() / scaleDown);
+            GL.UniformMatrix4(2, false, ref movement.viewMatrix);
+            GL.UniformMatrix4(3, false, ref movement.projMatrix);
+            GL.Uniform3(4, movement.position);
+            GL.Uniform1(5, maxLevelIter);
+            GL.Uniform1(6, maxIter);
+            GL.Uniform1(7, Voxel.size);
+            GL.Uniform1(8, debugView);
+            GL.Uniform1(9, maxReflections);
+            GL.Uniform1(10, useSubVoxels ? 1 : 0);
+            GL.Uniform1(11, reflectionRoughness);
+            GL.Uniform3(12, lightDirection.Normalized());
+            GL.Uniform1(13, useMipchainCacheOpt ? 1 : 0);
+            GL.Uniform1(14, usePropagatedBoundsOpt ? 1 : 0);
+            GL.Uniform1(15, maxSubVoxelIter);
+            GL.UniformMatrix4(16, false, ref lastFrameViewMatrix);
+            GL.Uniform1(17, (uint)frameCount);
+            GL.Uniform1(18, useTemporalReproOpt ? 1 : 0);
+            GL.Uniform3(19, lastPosition);
 
-            GL.BindTextureUnit(2, skybox.texture);
+            GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
+            GL.BindImageTexture(1, lastDepthTemporal, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32f);
+            GL.BindTextureUnit(2, voxel.texture);
+            GL.BindTextureUnit(3, skybox.texture);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
             GL.DispatchCompute(x, y, 1);
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
+            
+            
+            lastFrameViewMatrix = movement.viewMatrix;
+            lastPosition = movement.position;
 
             ImGuiDebug(delta);
             controller.Render();

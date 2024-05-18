@@ -4,7 +4,9 @@ using OpenTK.Windowing.Common;
 namespace Test123Bruh {
     internal class Program {
         static void Main(string[] args) {
-            var windowSettings = new GameWindowSettings();
+            var windowSettings = new GameWindowSettings() {
+                //UpdateFrequency = 1000,
+            };
             var nativeWindowSettings = new NativeWindowSettings() {
                 ClientSize = (800, 600),
                 WindowState = WindowState.Normal,

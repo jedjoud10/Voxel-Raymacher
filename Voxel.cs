@@ -10,9 +10,10 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Voxel {
         public int texture;
-        public static int size = 64;
+        public static int size = 128;
         public static int levels = Math.Min(Int32.Log2(size), 7);
         public ulong memoryUsage = 0;
+        public bool sparseTextures = false;
         Compute generation;
         Compute propagate;
 
@@ -21,7 +22,7 @@ namespace Test123Bruh {
          * Maybe lossless compression
          * 
          * Speed optimizations:
-         * Temporal depth reprojection from last frame (use it as "starting point" for iter)
+         * Temporal depth reprojection from last frame (use it as "starting point" for iter) (WIP)
          * AABB tree for node sizes 1 and larger (DONE)
          * AABB Bounds for sub-voxels, pre-calculated for EVERY possible sub-voxel combination. At runtime would just fetch the bounds from a texture maybe?
             * Bounds are symmetric in someways so we don't need to store *all* information really. Could be really optimized
@@ -34,52 +35,83 @@ namespace Test123Bruh {
          * Keep history of local child indices of un-hit child to avoid retracing from the top (DONE)
         */
 
-        public Voxel() {
-            /*
-            int sparse = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture3D, sparse);
-            int a = 1;
-            GL.TexParameterI(TextureTarget.Texture3D, (TextureParameterName)OpenTK.Graphics.OpenGL4.ArbSparseTexture.TextureSparseArb, ref a);
-
-            // TODO: This could be done once per internal format. For now, just do it every time.
-            int bestIndex = -1,
-                    bestXSize = 0,
-                    bestYSize = 0,
-                    bestZSize = 0;
-            GL.GetInternalformat(ImageTarget.Texture3D, SizedInternalFormat.Rg32ui, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.NumVirtualPageSizesArb, 1, out int indexCount);
+        static Vector3i[] GetPageSizesFor3DFormat(SizedInternalFormat format) {
+            GL.GetInternalformat(ImageTarget.Texture3D, format, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.NumVirtualPageSizesArb, 1, out int indexCount);
+            Vector3i[] sizes = new Vector3i[indexCount];
 
             if (indexCount == 0) {
-                throw new Exception("NO PAGES!!!");
+                Console.WriteLine("So page sizes!");
+                return null;
             }
 
-
+            Console.WriteLine("Format!!: " + format);
+            Console.WriteLine("Page format count: " + indexCount);
             for (int i = 0; i < indexCount; ++i) {
                 int copied = i;
                 GL.TexParameterI(TextureTarget.Texture3D, (TextureParameterName)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeIndexArb, ref copied);
 
-                GL.GetInternalformat(ImageTarget.Texture3D, SizedInternalFormat.Rg32ui, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeXArb, 1, out int xSize);
-                GL.GetInternalformat(ImageTarget.Texture3D, SizedInternalFormat.Rg32ui, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeXArb, 1, out int ySize);
-                GL.GetInternalformat(ImageTarget.Texture3D, SizedInternalFormat.Rg32ui, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeXArb, 1, out int zSize);
+                GL.GetInternalformat(ImageTarget.Texture3D, format, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeXArb, 1, out int xSize);
+                GL.GetInternalformat(ImageTarget.Texture3D, format, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeYArb, 1, out int ySize);
+                GL.GetInternalformat(ImageTarget.Texture3D, format, (InternalFormatParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeZArb, 1, out int zSize);
+                Console.WriteLine($"I: {i}, X: {xSize}, Y: {ySize}, Z: {zSize}");
 
-                Console.WriteLine($"X: {xSize}, Y: {ySize}, Z: {zSize}");
+                sizes[i] = new Vector3i(xSize, ySize, zSize);
+            }
 
-                if (xSize >= bestXSize && ySize >= bestYSize && zSize >= bestZSize) {
-                    bestIndex = i;
-                    bestXSize = xSize;
-                    bestYSize = ySize;
-                    bestZSize = zSize;
+            return sizes;
+        }
+
+        static Vector3i DoSparseStuff() {
+            int a = 1;
+            GL.TexParameterI(TextureTarget.Texture3D, (TextureParameterName)OpenTK.Graphics.OpenGL4.ArbSparseTexture.TextureSparseArb, ref a);
+
+
+            int bestIndex = 0;
+            GL.TexParameterI(TextureTarget.Texture3D, (TextureParameterName)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeIndexArb, ref bestIndex);
+            return GetPageSizesFor3DFormat(SizedInternalFormat.Rg32ui)[0];
+        }
+
+        public Voxel() {
+            /*
+            int sparse = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture3D, sparse);
+            */
+
+            /*
+            Console.WriteLine(GetPageSizesFor3DFormat(SizedInternalFormat.Rg32ui));
+            Console.WriteLine(GetPageSizesFor3DFormat(SizedInternalFormat.R32ui));
+            Console.WriteLine(GetPageSizesFor3DFormat(SizedInternalFormat.R8ui));
+            */
+
+            texture = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture3D, texture);
+            Vector3i pageSizes = default;
+            
+            if (sparseTextures)
+                DoSparseStuff();
+
+            Vector3i sizes = new Vector3i(size, size, size);
+            GL.TextureStorage3D(texture, levels, SizedInternalFormat.Rg32ui, size, size, size);
+
+            // Sparse textures not supported by renderdoc, so it'd be nice to be able to turn em off
+            if (sparseTextures) {
+                Console.WriteLine("Page size: " + pageSizes);
+                GL.GetTexParameterI(TextureTarget.Texture3D, (GetTextureParameter)OpenTK.Graphics.OpenGL4.ArbSparseTexture.NumSparseLevelsArb, out int numSparseLevels);
+                Console.WriteLine("Num Sparse Levels: " + numSparseLevels);
+
+                for (int i = 0; i < numSparseLevels; i++) {
+
+                    if (Vector3i.ComponentMax(sizes, pageSizes) == sizes) {
+                        Console.WriteLine("Level" + i, "Commited Size: " + sizes);
+                        GL.Ext.TexturePageCommitment(texture, i, 0, 0, 0, sizes.X, sizes.Y, sizes.Z, true);
+                    }
+
+                    sizes /= 2;
                 }
             }
 
-            GL.TexParameterI(TextureTarget.Texture3D, (TextureParameterName)OpenTK.Graphics.OpenGL4.ArbSparseTexture.VirtualPageSizeIndexArb, ref bestIndex);
-            */
-            texture = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture3D, texture);
-            GL.TextureStorage3D(texture, levels, SizedInternalFormat.Rg32ui, size, size, size);
-
             ulong memCalcSize = (ulong)size;
             for (int i = 0; i < levels; i++) {
-                //GL.Ext.TexturePageCommitment(texture, i, 0, 0, 0, testSize, testSize, testSize, true);
                 memoryUsage += memCalcSize * memCalcSize * memCalcSize * 4 * 2;
                 memCalcSize /= 2;
                 memCalcSize = Math.Max(memCalcSize, 1);
@@ -91,6 +123,7 @@ namespace Test123Bruh {
             GL.UseProgram(generation.program);
             GL.BindImageTexture(0, texture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rg32ui);
             GL.DispatchCompute(size / 4, size / 4, size / 4);
+            
 
             int testSize = size;
             GL.UseProgram(propagate.program);
@@ -104,12 +137,6 @@ namespace Test123Bruh {
                 int dispatches = (int)MathF.Ceiling((float)testSize / 4.0f);
                 GL.DispatchCompute(dispatches, dispatches, dispatches);
                 GL.MemoryBarrier(MemoryBarrierFlags.ShaderImageAccessBarrierBit);
-            }
-        }
-
-        public void Bind(int startingUnit) {
-            for (int i = 0; i < levels; i++) {
-                GL.BindImageTexture(i + startingUnit, texture, i, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.Rg32ui);
             }
         }
     }

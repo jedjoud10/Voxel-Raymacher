@@ -132,6 +132,7 @@ out vec4 outputColor;
 void main()
 {
     outputColor = color * texture(in_fontTexture, texCoord);
+    //outputColor = vec4(texCoord, 0, 1);
 }";
 
             _shader = CreateProgram("ImGui", VertexSource, FragmentSource);
