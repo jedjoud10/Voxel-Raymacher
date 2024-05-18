@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Voxel {
         public int texture;
-        public static int size = 128;
+        public static int size = 256;
         public static int levels = Math.Min(Int32.Log2(size), 7);
         public int memoryUsage = 0;
         Compute generation;
@@ -26,6 +26,11 @@ namespace Test123Bruh {
          * AABB tree for node sizes 1 and larger (DONE)
          * AABB Bounds for sub-voxels, pre-calculated for EVERY possible sub-voxel combination. At runtime would just fetch the bounds from a texture maybe?
             * Bounds are symmetric in someways so we don't need to store *all* information really. Could be really optimized
+            * Since terrain is generally flat, we can split the 4x4x4 into 4 bounds of 4x4
+            * 2 bits * 3 axis * 2 (min/max) = 12 bits for each bound
+            * Each bound has 4x4 sub-voxels, so 2^16 combinations, 65536. 
+            * 65536 * 12 bits each => 768kb
+         * Run low-res "pre-render" thingy that will cache minimum required depths (using ray thickness or cone instead of ray)
          * Use bitwise stuff for acceleration levels (nah)
          * Keep history of local child indices of un-hit child to avoid retracing from the top (DONE)
         */

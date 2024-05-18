@@ -43,11 +43,8 @@ namespace Test123Bruh {
         }
 
         private static string GetResourceDir() {
-            string execPath = System.Reflection.Assembly.GetEntryAssembly().Location;
-            execPath = Path.GetDirectoryName(execPath);
-            execPath = AppDomain.CurrentDomain.BaseDirectory;
-            string global = Path.Combine(execPath, "Resources");
-            return global;
+            string execPath = AppDomain.CurrentDomain.BaseDirectory;
+            return Path.Combine(execPath, "Resources");
         }
 
         private static string Preprocess(string input, ref List<string> deps) {

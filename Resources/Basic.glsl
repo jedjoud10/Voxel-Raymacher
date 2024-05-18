@@ -281,7 +281,16 @@ void main() {
 			}
 
 			if (temp_hit || use_sub_voxels == 0) {
-				/*
+				// Find normal using another intersection test
+				int min_side_hit = 0;
+				int max_side_hit = 0;
+				pos += ray_dir * 0.001;
+				float scale = (use_sub_voxels == 1) ? 0.25 : 1;
+				vec3 grid_level_point = floor(pos / scale) * scale;
+				intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
+				normal = get_internal_box_normal(max_side_hit, ray_dir);
+
+
 				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
@@ -302,16 +311,7 @@ void main() {
 						break;
 					}
 				}
-				*/
 
-				// Find normal using another intersection test
-				int min_side_hit = 0;
-				int max_side_hit = 0;
-				pos += ray_dir * 0.01;
-				float scale = (use_sub_voxels == 1) ? 0.25 : 1;
-				vec3 grid_level_point = floor(pos / scale) * scale;
-				intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
-				normal = get_internal_box_normal(max_side_hit, ray_dir);
 
 				color = lighting(pos, normal, ray_dir);
 				hit = true;
@@ -339,7 +339,7 @@ void main() {
 		color = vec3(total_iterations / float(max_iters));
 	}
 	else if (debug_view == 3) {
-		color = vec3(min_level_reached / float(100));
+		color = vec3(min_level_reached / float(max_mip_iter));
 	}
 	else if (debug_view == 4) {
 		color = vec3(total_inner_bit_fetches / float(60));
