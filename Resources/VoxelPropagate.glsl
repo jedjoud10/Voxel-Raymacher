@@ -8,7 +8,7 @@ layout(location = 2) uniform int propagate_bounds;
 void main() {
 	bool store_any = false;
 	uvec3 bounds_min = uvec3(100000);
-	uvec3 bounds_max = uvec3(-100000);
+	uvec3 bounds_max = uvec3(0);
 	
 	for (int x = 0; x < 2; x++)
 	{

@@ -16,6 +16,7 @@ layout(location = 10) uniform int use_sub_voxels;
 layout(location = 11) uniform float reflection_roughness;
 layout(location = 12) uniform vec3 light_dir;
 layout(location = 13) uniform int use_octree_ray_caching;
+layout(location = 14) uniform int use_prop_aabb_bounds;
 layout(rg32ui, binding = 1) uniform uimage3D voxels[7];
 layout(binding = 2) uniform samplerCube skybox;
 
@@ -110,16 +111,37 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 		// use the mip maps themselves as an acceleration structure
 		float scale_factor = pow(2, j);
 		vec3 grid_level_point = floor(pos / scale_factor) * scale_factor;
+		vec3 bounds_min = grid_level_point;
+		vec3 bounds_max = bounds_min + vec3(scale_factor);
 
 		// calculate temporary distance to the end of the current cell for the current mipmap
 		int a = 0;
 		int b = 0;
-		vec2 distances = intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(scale_factor), a, b);
-		float t_voxel_distance = distances.y - distances.x;
-		ivec3 tex_point = ivec3(floor(pos / scale_factor));
+		vec2 distances = intersection(pos, ray_dir, inv_dir, bounds_min, bounds_max, a, b);
+		float t_voxel_distance = distances.y;
+		min_level_reached += 1;
 
+		// instead of using the bounds directly, use the propagated aabb for tighter culling
+		ivec3 tex_point = ivec3(floor(pos / scale_factor));
 		uvec2 data = imageLoad(voxels[j], tex_point).xy;
-		if (all(data == uvec2(0))) {
+		if (j > 0 && use_prop_aabb_bounds == 1) {
+			uint mint = data.x;
+			uint mauint = data.y;
+			uvec3 last_min = uvec3(mint & 0x3FF, (mint >> 10) & 0x3FF, (mint >> 20) & 0x3FF);
+			uvec3 last_max = uvec3(mauint & 0x3FF, (mauint >> 10) & 0x3FF, (mauint >> 20) & 0x3FF);
+			vec2 bounds_distances = intersection(pos, ray_dir, inv_dir, vec3(last_min), vec3(last_max), a, b);
+			
+			/*
+			if (bounds_distances.x < bounds_distances.y) {
+				float t_voxel_distance_2 = bounds_distances.x;
+				t_voxel_distance = min(t_voxel_distance_2, t_voxel_distance);
+			}
+			*/
+		}
+
+		// skip over big areas!!!
+		// FIXME: For some reason on my iGPU all(data == uvec2(0)) doesn't compile :3
+		if (data.x == 0 && data.y == 0) {
 			// calculate child offset relative to parent
 			/*
 			vec3 center = grid_level_point;
@@ -150,12 +172,15 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 			
 			voxel_distance = t_voxel_distance;
 			hit = false;
-			min_level_reached = min(min_level_reached, j);
+			//min_level_reached = min(min_level_reached, j);
 
 			int min_side_hit = 0;
 			int max_side_hit = 0;
-			intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(scale_factor), min_side_hit, max_side_hit);
-			normal = get_internal_box_normal(max_side_hit, ray_dir);
+
+			if (use_sub_voxels == 0) {
+				intersection(pos, ray_dir, inv_dir, grid_level_point, grid_level_point + vec3(scale_factor), min_side_hit, max_side_hit);
+				normal = get_internal_box_normal(max_side_hit, ray_dir);
+			}
 
 			break;
 		}
@@ -229,7 +254,7 @@ void main() {
 	float total_iterations = 0.0;
 	float total_mip_map_iterations = 0.0;
 	float total_inner_bit_fetches = 0.0;
-	float min_level_reached = 1000;
+	float min_level_reached = 0;
 	int reflections_iters = 0;
 	float factor = 1.0;
 
@@ -258,6 +283,7 @@ void main() {
 			}
 
 			if (temp_hit || use_sub_voxels == 0) {
+				/*
 				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
@@ -278,6 +304,7 @@ void main() {
 						break;
 					}
 				}
+				*/
 
 				color = lighting(pos, normal, ray_dir);
 				hit = true;
@@ -298,14 +325,18 @@ void main() {
 	else if (debug_view == 1) {
 		int min_dir = 0;
 		int max_dir = 0;
-		vec2 dists = intersection(pos, ray_dir, inv_dir, vec3(0), vec3(map_size), min_dir, max_dir);
-		color = get_internal_box_normal(max_dir, ray_dir);
+		vec2 dists = intersection(pos, ray_dir, inv_dir, vec3(0), vec3(10), min_dir, max_dir);
+		//color = get_internal_box_normal(max_dir, ray_dir);
+		if (dists.y > dists.x) {
+			color = vec3(dists.x);
+		}
+		//color = vec3(dists.y - dists.x);
 	}
 	else if (debug_view == 2) {
 		color = vec3(total_iterations / float(max_iters));
 	}
 	else if (debug_view == 3) {
-		color = vec3(min_level_reached / float(max_mip_iter));
+		color = vec3(min_level_reached / float(100));
 	}
 	else if (debug_view == 4) {
 		color = vec3(total_inner_bit_fetches / float(60));
@@ -316,6 +347,15 @@ void main() {
 	else if (debug_view == 6) {
 		normal = normalize(normal);
 		color = normal;		
+	}
+	else if (debug_view == 7) {
+		color = pos;
+	}
+	else if (debug_view == 8) {
+		color = pos - floor(pos);
+	}
+	else if (debug_view == 9) {
+		color = pos * 4 - floor(pos * 4);
 	}
 
 	// store the value in the image that we will blit

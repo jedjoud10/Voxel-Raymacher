@@ -17,14 +17,14 @@ namespace Test123Bruh {
         Compute propagate;
 
         /* Memory Optimizations:
-         * Sparse textures
+         * Sparse textures (WIP)
          * Maybe lossless compression
          * Use bitwise stuff for acceleration levels
          * 
          * Speed optimizations:
          * Temporal depth reprojection from last frame (use it as "starting point" for iter)
-         * AABB tree
-         * Use bitwise stuff for acceleration levels
+         * AABB tree (WIP)
+         * Use bitwise stuff for acceleration levels (nah)
          * Keep history of local child indices of un-hit child to avoid retracing from the top (DONE)
         */
 

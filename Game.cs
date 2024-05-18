@@ -29,6 +29,7 @@ namespace Test123Bruh {
         int debugView = 0;
         bool useSubVoxels = false;
         bool useMipchainCacheOpt = false;
+        bool usePropagatedBoundsOpt = false;
         ulong frameCount = 0;
         Vector3 lightDirection = new Vector3(1f, 1f, 1f);
         float[] frameGraphData = new float[512];
@@ -129,7 +130,7 @@ namespace Test123Bruh {
             ImGui.Text("F3: Take screenshot and save it as Jpeg");
             ImGui.ListBox("Debug View Type", ref debugView, new string[] {
                 "Non-Debug", "Map intersection normal", "Total iterations",
-                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals" }, 7);
+                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position", "Local Position", "Sub-voxel Local Position" }, 10);
             ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
             ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
@@ -140,6 +141,7 @@ namespace Test123Bruh {
                 "8x" }, 4);
             ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
             ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
+            ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
             ImGui.Text("Map Size: " + Voxel.size);
             ImGui.Text("Map Max Levels: " + Voxel.levels);
             ImGui.Text("Map Memory Usage: " + (voxel.memoryUsage/(1024*1024)) + "mb");
@@ -199,6 +201,7 @@ namespace Test123Bruh {
             GL.ProgramUniform1(compute.program, 11, reflectionRoughness);
             GL.ProgramUniform3(compute.program, 12, lightDirection.Normalized());
             GL.ProgramUniform1(compute.program, 13, useMipchainCacheOpt ? 1 : 0);
+            GL.ProgramUniform1(compute.program, 14, usePropagatedBoundsOpt ? 1 : 0);
             voxel.Bind(1);
 
             GL.BindTextureUnit(2, skybox.texture);
