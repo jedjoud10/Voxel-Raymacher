@@ -38,6 +38,13 @@ namespace Test123Bruh {
         float[] frameGraphData = new float[512];
         Matrix4 lastFrameViewMatrix = Matrix4.Identity;
         Vector3 lastPosition = Vector3.Zero;
+
+        float ambientStrength = 0.4f;
+        float normalMapStrength = 0.0f;
+        float glossStrength = 0.4f;
+        float specularStrength = 0.1f;
+        Vector3 topColor = new Vector3(4, 117, 30) / 255.0f;
+        Vector3 sideColor = new Vector3(69, 46, 21) / 255.0f;
         
         private static void OnDebugMessage(
             DebugSource source,     // Source of the debugging message.
@@ -133,6 +140,17 @@ namespace Test123Bruh {
 
         // Render ImGui Stuff!!!
         private void ImGuiDebug(float delta) {
+            System.Numerics.Vector3 ToVec3(Vector3 v) {
+                return new System.Numerics.Vector3(v.X, v.Y, v.Z);
+            }
+
+            void FromVec3(System.Numerics.Vector3 input, ref Vector3 output) {
+                output.X = input.X;
+                output.Y = input.Y;
+                output.Z = input.Z;
+            }
+
+
             bool t = true;
             ImGui.Begin("Voxel Raymarcher Test Window!", ref t, ImGuiWindowFlags.MenuBar);
             ImGui.Text("Frame timings: " + delta + ", FPS: " + (1.0 / delta));
@@ -165,11 +183,24 @@ namespace Test123Bruh {
                 ImGui.Image((nint)lastDepthTemporal, new System.Numerics.Vector2(ClientSize.X, ClientSize.Y) / scaleDownTest, uv0, uv1);
             }
 
-            System.Numerics.Vector3 v = new System.Numerics.Vector3(lightDirection.X, lightDirection.Y, lightDirection.Z);
-            ImGui.SliderFloat3("Sun direction", ref v, -1f, 1f);
-            lightDirection.X = v.X;
-            lightDirection.Y = v.Y;
-            lightDirection.Z = v.Z;
+            System.Numerics.Vector3 dir = ToVec3(lightDirection);
+            ImGui.SliderFloat3("Sun direction", ref dir, -1f, 1f);
+            FromVec3(dir, ref lightDirection);
+
+
+            System.Numerics.Vector3 color = ToVec3(topColor);
+            ImGui.ColorPicker3("Top Color", ref color);
+            FromVec3(color, ref topColor);
+
+            color = ToVec3(sideColor);
+            ImGui.ColorPicker3("Side Color", ref color);
+            FromVec3(color, ref sideColor);
+
+            ImGui.SliderFloat("Ambient Strength", ref ambientStrength, 0.0f, 1.0f);
+            ImGui.SliderFloat("Normals Strength", ref normalMapStrength, 0.0f, 1.0f);
+            ImGui.SliderFloat("Gloss Strength", ref glossStrength, 0.0f, 1.0f);
+            ImGui.SliderFloat("Specular Strength", ref specularStrength, 0.0f, 1.0f);
+
             ImGui.End();            
 
             //ImGui.DockSpaceOverViewport();
@@ -225,6 +256,12 @@ namespace Test123Bruh {
             GL.Uniform1(17, (uint)frameCount);
             GL.Uniform1(18, useTemporalReproOpt ? 1 : 0);
             GL.Uniform3(19, lastPosition);
+            GL.Uniform1(20, ambientStrength);
+            GL.Uniform1(21, normalMapStrength);
+            GL.Uniform1(22, glossStrength);
+            GL.Uniform1(23, specularStrength);
+            GL.Uniform3(24, topColor);
+            GL.Uniform3(25, sideColor);
 
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             GL.BindImageTexture(1, lastDepthTemporal, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32f);
@@ -232,10 +269,12 @@ namespace Test123Bruh {
             GL.BindTextureUnit(3, skybox.texture);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
+
+
             GL.DispatchCompute(x, y, 1);
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
-            
-            
+
+
             lastFrameViewMatrix = movement.viewMatrix;
             lastPosition = movement.position;
 

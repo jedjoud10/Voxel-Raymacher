@@ -24,6 +24,7 @@
   <ItemGroup>
     <None Remove="Resources\BasicCopy.glsl" />
     <None Remove="Resources\Hashes.glsl" />
+    <None Remove="Resources\Intersections.glsl" />
     <None Remove="Resources\Lighting.glsl" />
     <None Remove="Resources\Noise.glsl" />
     <None Remove="Resources\Skybox.glsl" />

@@ -1,8 +1,8 @@
 ﻿#version 460 core
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
-layout(rg32ui, binding = 0, location = 0) uniform uimage3D last_voxels;
-layout(rg32ui, binding = 1, location = 1) uniform uimage3D next_voxels;
+layout(rgba32ui, binding = 0, location = 0) uniform uimage3D last_voxels;
+layout(rgba32ui, binding = 1, location = 1) uniform uimage3D next_voxels;
 layout(location = 2) uniform int propagate_bounds;
 
 void main() {

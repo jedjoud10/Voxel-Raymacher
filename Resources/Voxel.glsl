@@ -3,7 +3,7 @@
 #include Noise.glsl
 
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
-layout(rg32ui, binding = 0, location = 0) uniform uimage3D voxels;
+layout(rgba32ui, binding = 0, location = 0) uniform uimage3D voxels;
 
 float sdBox(vec3 p, vec3 b)
 {
