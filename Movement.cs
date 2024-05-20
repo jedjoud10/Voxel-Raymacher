@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Test123Bruh {
     internal class Movement {
-        Quaternion rotation;
+        Quaternion rotation = Quaternion.Identity;
         public float smoothing = 20.0f;
         public Vector3 position = new Vector3((float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f);
         public Matrix4 projMatrix;
@@ -20,7 +20,7 @@ namespace Test123Bruh {
 
         // Moves the player position and handles rotation
         public void Move(MouseState mouse, KeyboardState keyboard, float delta) {
-            mousePosTest += mouse.Delta * 0.0005f;
+            mousePosTest += Vector2.Clamp(mouse.Delta, -Vector2.One * 200, Vector2.One * 200) * 0.0005f;
             Quaternion newRotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
             rotation = Quaternion.Slerp(rotation, newRotation, MathHelper.Clamp(smoothing * delta * 5, 0f, 1f));
 
@@ -51,7 +51,7 @@ namespace Test123Bruh {
         public void UpdateMatrices(float ratio, bool rando) {
             Quaternion randoRot = rando ? Quaternion.FromEulerAngles(rng.NextSingle() * 0.001f, rng.NextSingle() * 0.001f, 0.0f) : Quaternion.Identity;
             viewMatrix = Matrix4.CreateFromQuaternion(rotation);
-            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(80.0f), ratio, 0.1f, 1000.0f);
+            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(80.0f), ratio, 0.01f, 10.0f);
         }
     }
 }

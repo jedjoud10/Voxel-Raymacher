@@ -38,6 +38,7 @@ namespace Test123Bruh {
         float[] frameGraphData = new float[512];
         Matrix4 lastFrameViewMatrix = Matrix4.Identity;
         Vector3 lastPosition = Vector3.Zero;
+        bool holdTemporalValues = false;
 
         float ambientStrength = 0.4f;
         float normalMapStrength = 0.0f;
@@ -160,7 +161,8 @@ namespace Test123Bruh {
             ImGui.Text("F3: Take screenshot and save it as Jpeg");
             ImGui.ListBox("Debug View Type", ref debugView, new string[] {
                 "Non-Debug", "Map intersection normal", "Total iterations",
-                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position", "Local Position", "Sub-voxel Local Position", "Scene Depth (log)" }, 11);
+                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position",
+                "Local Position", "Sub-voxel Local Position", "Scene Depth (log)", "Reprojected Scene Depth (log)" }, 12);
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
             ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
             ImGui.SliderInt("Max Sub-Voxel Iters", ref maxSubVoxelIter, 0, 6);
@@ -174,6 +176,7 @@ namespace Test123Bruh {
             ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
             ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
             ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
+            ImGui.Checkbox("Hold Temporal Values?", ref holdTemporalValues);
             ImGui.Text("Map Size: " + Voxel.MapSize);
             ImGui.Text("Map Max Levels: " + voxel.levels);
             ImGui.Text("Using Sparse Textures?: " + Voxel.SparseTextures);
@@ -234,7 +237,7 @@ namespace Test123Bruh {
             if (CursorState == CursorState.Grabbed) {
                 movement.Move(MouseState, KeyboardState, delta);
             }
-            movement.UpdateMatrices((float)ClientSize.Y / (float)ClientSize.X, useTemporalReproOpt);
+            
             
             // Fullscreen toggle 
             if (KeyboardState.IsKeyPressed(Keys.F5)) {
@@ -246,9 +249,18 @@ namespace Test123Bruh {
                 CursorState = 2 - CursorState;
             }
 
+            /*
+            if (KeyboardState.IsKeyDown(Keys.F2)) {
+                debugView = 11;
+            } else {
+                debugView = 10;
+            }
+            */
+
             // Bind compute shader and execute it
             GL.UseProgram(compute.program);
             int scaleDown = 1 << scaleDownFactor;
+            movement.UpdateMatrices((float)(ClientSize.Y / scaleDown) / (float)(ClientSize.X / scaleDown), useTemporalReproOpt);
             GL.Uniform2(1, ClientSize.ToVector2() / scaleDown);
             GL.UniformMatrix4(2, false, ref movement.viewMatrix);
             GL.UniformMatrix4(3, false, ref movement.projMatrix);
@@ -274,6 +286,7 @@ namespace Test123Bruh {
             GL.Uniform1(23, specularStrength);
             GL.Uniform3(24, topColor);
             GL.Uniform3(25, sideColor);
+            GL.Uniform1(26, holdTemporalValues ? 1 : 0);
 
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             GL.BindImageTexture(1, lastDepthTemporal, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32f);
@@ -287,9 +300,10 @@ namespace Test123Bruh {
             GL.DispatchCompute(x, y, 1);
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
 
-
-            lastFrameViewMatrix = movement.viewMatrix;
-            lastPosition = movement.position;
+            if (!holdTemporalValues) {
+                lastFrameViewMatrix = movement.viewMatrix;
+                lastPosition = movement.position;
+            }
 
             ImGuiDebug(delta);
             controller.Render();

@@ -25,12 +25,12 @@ namespace Test123Bruh {
         Compute propagate;
 
         /* Memory Optimizations:
-         * Sparse textures (WIP)
+         * Sparse textures (DONE)
          * Maybe lossless compression
          * 
          * Speed optimizations:
          * Optimize iteration using subgroup shenanigans?
-         * Temporal depth reprojection from last frame (use it as "starting point" for iter) (WIP)
+         * Temporal depth reprojection from last frame (use it as "starting point" for iter) (DONE, but buggy)
          * AABB tree for node sizes 1 and larger (DONE)
          * AABB Bounds for sub-voxels, pre-calculated for EVERY possible sub-voxel combination. At runtime would just fetch the bounds from a texture maybe?
             * Bounds are symmetric in someways so we don't need to store *all* information really. Could be really optimized

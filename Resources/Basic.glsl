@@ -37,6 +37,7 @@ layout(location = 23) uniform float specular_strength;
 layout(location = 24) uniform vec3 top_color;
 layout(location = 25) uniform vec3 side_color;
 layout(r32i, binding = 4) uniform iimage3D sparse_helper;
+layout(location = 26) uniform int hold_temporal_values;
 
 #include Hashes.glsl
 #include Lighting.glsl
@@ -49,14 +50,15 @@ void main() {
 	coords -= 1.0;
 
 	// apply projection transformations for ray dir
-	vec3 ray_dir = (view_matrix * proj_matrix * vec4(coords, 1, 0)).xyz;
-	vec2 lastuvs = (inverse(last_frame_view_matrix * proj_matrix) * vec4(ray_dir, 0.0)).xy;
-	ray_dir = normalize(ray_dir);
+	vec3 ray_dir_unormalized = (view_matrix * proj_matrix * vec4(coords, 1, 0)).xyz;
+	vec3 ray_dir = normalize(ray_dir_unormalized);
+
+	// this should work??? why does it not work???
+	vec4 lastuvst = (inverse(last_frame_view_matrix) * vec4(ray_dir, 1.0));
 	vec3 inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 
 	// ray marching stuff
-	float start_offset = 1.0;
-	vec3 pos = position + ray_dir * start_offset;
+	vec3 pos = position;
 	bool hit = false;
 
 	// vars for default view
@@ -72,21 +74,18 @@ void main() {
 	int reflections_iters = 0;
 	float factor = 1.0;
 
-	// try reprojecting last frame depth into current frame depth as accel structure
-	// how????
-	// need to get the uv of the current pixel but using the last frame's view matrix
-	// last_frame_view_matrix
-	// temporal_depth
-	//pos += ray_dir * 10;
-	
-	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(vec2(gl_GlobalInvocationID.xy) / resolution, 0, 1.0));
+	// what the FUCK is this constant???
+	// only works for y fov at 80
+
+	vec2 lastuvs = lastuvst.xy / (-lastuvst.z);
+	float magic_fucking_fov_number_PLEASE_HELP = 0.841;
+	lastuvs *= (resolution.yx / resolution.x) * magic_fucking_fov_number_PLEASE_HELP;
 	lastuvs += 1;
 	lastuvs /= 2;
-	ivec2 pixelu = ivec2(lastuvs * resolution);
-	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(pixelu, 0, 1.0));
 
-	vec3 advanced_pos = pos;
-	if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && use_temporal_depth == 1) {
+	ivec2 pixelu = ivec2(lastuvs * resolution);
+	
+	if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && lastuvst.z < 0 && use_temporal_depth == 1) {
 		// WARNING: This WILL NOT work with reflections because pos would be the reflected pos, making the ray overshoot really far
 		float min_depth = 1000;
 
@@ -95,31 +94,14 @@ void main() {
 		{
 			for (int y = -scaler; y < scaler; y++)
 			{
-				float last_depth = imageLoad(temporal_depth, pixelu + ivec2(x,y) * 2).x;
+				float last_depth = imageLoad(temporal_depth, pixelu + ivec2(x,y) * 3).x;
 				min_depth = min(last_depth, min_depth);
 			}
 		}
 
 		// add margin if we are moving in the direction of the ray
-		float margin = clamp(dot(position - last_position, ray_dir), 0, 1);
-		advanced_pos += ray_dir * (min_depth - 0.01 - margin - start_offset);
-
-		// (mod(gl_GlobalInvocationID.x, 2) == 1 ^^ mod(gl_GlobalInvocationID.y, 2) == 0) 
-		// ((frame_count % 60) < 58))
+		pos += ray_dir * (min_depth - 0.01);
 	}
-
-	pos = advanced_pos;
-
-	// check if the advanced pos's voxel matches up with the actual terrain
-	/*
-	advanced_pos += ray_dir * 0.001;
-	float scale = (use_sub_voxels == 1) ? 0.5 : 1;
-	vec3 grid_level_point = floor(pos / scale) * scale;
-	vec3 distsaa = intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale));
-	float close = distsaa.x;
-	*/
-
-	// check if there is a discrepency in the closest "real" distance and 
 
 
 	for (int i = 0; i < max_iters; i++) {
@@ -241,13 +223,18 @@ void main() {
 	else if (debug_view == 10) {
 		color = vec3(log(depth) / 5, 0, 0);
 	}
+	else if (debug_view == 11) {
+		float repr_depth = 0;
+		if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && lastuvst.z < 0) {
+			repr_depth = imageLoad(temporal_depth, pixelu).x;
+		}
+		color = vec3(log(repr_depth) / 5, 0, 0);
+	}
 
 	// store the value in the image that we will blit
 	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 
-	if (!hit) {
-		depth = 1000.0;
+	if (hold_temporal_values == 0) {
+		imageStore(temporal_depth, ivec2(gl_GlobalInvocationID.xy), vec4(depth, 0, 0, 1.0));
 	}
-
-	imageStore(temporal_depth, ivec2(gl_GlobalInvocationID.xy), vec4(depth, 0, 0, 1.0));
 }
