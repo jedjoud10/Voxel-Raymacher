@@ -53,13 +53,15 @@ void main() {
 	vec4 ray_dir_test = inverse(proj_matrix) * vec4(coords, -1.0, 1.0);
 	ray_dir_test.w = 0.0;
 	ray_dir_test = inverse(view_matrix) * ray_dir_test;
-	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(normalize(ray_dir_test.xyz).y), 1.0));
-	//return;
-
-	vec3 ray_dir = normalize(ray_dir_test.xyz);
 
 	// this should work??? why does it not work???
-	vec4 lastuvst = (inverse(last_frame_view_matrix) * vec4(ray_dir, 1.0));
+	//vec4 lastuvst = (last_frame_view_matrix * vec4(ray_dir, 1.0));
+	vec4 lastuvst = (last_frame_view_matrix * vec4(ray_dir_test.xyz, 0.0));
+	lastuvst.w = 0.0;
+	vec4 exactsame = (proj_matrix * lastuvst);
+	exactsame.xy /= exactsame.w;
+
+	vec3 ray_dir = normalize(ray_dir_test.xyz);
 	vec3 inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 
 	// ray marching stuff
@@ -83,11 +85,28 @@ void main() {
 	// only works for y fov at 80
 
 	vec2 lastuvs = lastuvst.xy / (-lastuvst.z);
+	//vec2 lastuvs = lastuvst.xy / (-lastuvst.z);
 	float magic_fucking_fov_number_PLEASE_HELP = 0.841;
-	lastuvs *= (resolution.yx / resolution.x) * magic_fucking_fov_number_PLEASE_HELP;
+	//lastuvs *= (resolution.yx / resolution.x);
+
+	// convert the [-1,1] range to [0,1] for texture sampling
+	lastuvs = exactsame.xy;
 	lastuvs += 1;
 	lastuvs /= 2;
 
+	//lastuvst /= -lastuvst.z;
+
+	/*
+	if (exactsame.x > -1 && exactsame.y > -1 && exactsame.x < 1 && exactsame.y < 1) {
+		imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(exactsame.xy, 0, 1.0));
+	}
+	else {
+		imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(0, 0, 0, 1.0));
+	}
+	return;
+	*/
+
+	
 	ivec2 pixelu = ivec2(lastuvs * resolution);
 	
 	if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && lastuvst.z < 0 && use_temporal_depth == 1) {
@@ -230,10 +249,12 @@ void main() {
 	}
 	else if (debug_view == 11) {
 		float repr_depth = 0;
+		color = vec3(0);
 		if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && lastuvst.z < 0) {
 			repr_depth = imageLoad(temporal_depth, pixelu).x;
+			color = vec3(log(repr_depth) / 5, 0, 0);
+			//color = vec3(lastuvs, 0);
 		}
-		color = vec3(log(repr_depth) / 5, 0, 0);
 	}
 
 	if (!hit && reflections_iters == 0) {

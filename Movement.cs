@@ -21,7 +21,8 @@ namespace Test123Bruh {
 
         // Moves the player position and handles rotation
         public void Move(MouseState mouse, KeyboardState keyboard, float delta) {
-            mousePosTest += Vector2.Clamp(mouse.Delta, -Vector2.One * 200, Vector2.One * 200) * 0.0005f;
+            //mousePosTest += Vector2.Clamp(mouse.Delta, -Vector2.One * 200, Vector2.One * 200) * 0.0005f;
+            mousePosTest += mouse.Delta * 0.0005f;
             Quaternion newRotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
             rotation = Quaternion.Slerp(rotation, newRotation, MathHelper.Clamp(smoothing * delta * 5, 0f, 1f));
 

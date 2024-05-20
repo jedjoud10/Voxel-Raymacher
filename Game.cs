@@ -119,7 +119,7 @@ namespace Test123Bruh {
             base.OnMouseWheel(e);
             controller.MouseScroll(e.Offset);
 
-            movement.hFov -= e.OffsetY;
+            //movement.hFov -= e.OffsetY;
         }
 
         // Capture a screenshot and save to a folder next to the executable
