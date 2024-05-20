@@ -49,9 +49,14 @@ void main() {
 	coords *= 2.0;
 	coords -= 1.0;
 
-	// apply projection transformations for ray dir
-	vec3 ray_dir_unormalized = (view_matrix * proj_matrix * vec4(coords, 1, 0)).xyz;
-	vec3 ray_dir = normalize(ray_dir_unormalized);
+	// apply projection transformations for ray 
+	vec4 ray_dir_test = inverse(proj_matrix) * vec4(coords, -1.0, 1.0);
+	ray_dir_test.w = 0.0;
+	ray_dir_test = inverse(view_matrix) * ray_dir_test;
+	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(vec3(normalize(ray_dir_test.xyz).y), 1.0));
+	//return;
+
+	vec3 ray_dir = normalize(ray_dir_test.xyz);
 
 	// this should work??? why does it not work???
 	vec4 lastuvst = (inverse(last_frame_view_matrix) * vec4(ray_dir, 1.0));
@@ -87,12 +92,12 @@ void main() {
 	
 	if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && lastuvst.z < 0 && use_temporal_depth == 1) {
 		// WARNING: This WILL NOT work with reflections because pos would be the reflected pos, making the ray overshoot really far
-		float min_depth = 1000;
+		float min_depth = 10000;
 
 		int scaler = 2;
-		for (int x = -scaler; x < scaler; x++)
+		for (int x = -scaler; x <= scaler; x++)
 		{
-			for (int y = -scaler; y < scaler; y++)
+			for (int y = -scaler; y <= scaler; y++)
 			{
 				float last_depth = imageLoad(temporal_depth, pixelu + ivec2(x,y) * 3).x;
 				min_depth = min(last_depth, min_depth);
@@ -103,7 +108,7 @@ void main() {
 		pos += ray_dir * (min_depth - 0.01);
 	}
 
-
+	vec3 first_touched_pos = vec3(0);
 	for (int i = 0; i < max_iters; i++) {
 		bool temp_hit = true;
 		total_iterations += 1;
@@ -117,13 +122,10 @@ void main() {
 		// recursively go through the mip chain
 		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, level_cache);
 
-		//voxel_distance = subgroupMax(voxel_distance);
-
 		// gotta add a small offset since we'd be on the very face of the voxel
 		pos += ray_dir * max(0.001, voxel_distance);
 
 		// do all of our lighting calculations here
-		//subgroupBarrier();
 		if (temp_hit) {
 			temp_hit = false;
 
@@ -137,11 +139,15 @@ void main() {
 				int max_side_hit = 0;
 				pos += ray_dir * 0.001;
 				float scale = (use_sub_voxels == 1) ? 0.25 : 1;
+
+				if (reflections_iters == 0) {
+					first_touched_pos = pos;
+				}
+
 				vec3 grid_level_point = floor(pos / scale) * scale;
 				vec2 dists = intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
 				normal = get_internal_box_normal(max_side_hit, ray_dir);
 
-				/*
 				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
@@ -162,8 +168,7 @@ void main() {
 						break;
 					}
 				}
-				*/
-				//subgroupBarrier();
+
 				color = lighting(pos, normal, ray_dir);
 
 				// dim the block faces if they are facing inside
@@ -179,7 +184,7 @@ void main() {
 	}
 
 	// store depth values!!
-	float depth = distance(pos, position);
+	float depth = distance(first_touched_pos, position);
 
 	// ACTUAL GAME VIEW
 	if (debug_view == 0) {
@@ -229,6 +234,10 @@ void main() {
 			repr_depth = imageLoad(temporal_depth, pixelu).x;
 		}
 		color = vec3(log(repr_depth) / 5, 0, 0);
+	}
+
+	if (!hit && reflections_iters == 0) {
+		depth = 10000;
 	}
 
 	// store the value in the image that we will blit

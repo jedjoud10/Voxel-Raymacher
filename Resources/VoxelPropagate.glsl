@@ -32,7 +32,7 @@ void main() {
 					invis = (data.x == 0 && data.y == 0);
 				}
 				else {
-					invis = (data.x == 0 && data.y == 0) || (data.x == 0xffffffff && data.y == 0xffffffff);
+					invis = (data.x == 0 && data.y == 0);
 				}
 
 				if (has_matter) {

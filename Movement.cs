@@ -10,7 +10,8 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Movement {
         Quaternion rotation = Quaternion.Identity;
-        public float smoothing = 20.0f;
+        public float smoothing = 15.0f;
+        public float hFov = 80.0f;
         public Vector3 position = new Vector3((float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f);
         public Matrix4 projMatrix;
         public Matrix4 viewMatrix;
@@ -51,7 +52,9 @@ namespace Test123Bruh {
         public void UpdateMatrices(float ratio, bool rando) {
             Quaternion randoRot = rando ? Quaternion.FromEulerAngles(rng.NextSingle() * 0.001f, rng.NextSingle() * 0.001f, 0.0f) : Quaternion.Identity;
             viewMatrix = Matrix4.CreateFromQuaternion(rotation);
-            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(80.0f), ratio, 0.01f, 10.0f);
+
+            float yFov = 2.0f * MathF.Atan(MathF.Tan(MathHelper.DegreesToRadians(hFov) / 2.0f) * (1.0f/ratio));
+            projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.Clamp(yFov, 0.001f, 1.99f * MathF.PI), 1.0f/ratio, 1.0f, 100.0f);
         }
     }
 }

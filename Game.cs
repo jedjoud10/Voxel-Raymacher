@@ -24,7 +24,7 @@ namespace Test123Bruh {
         int lastDepthTemporal;
 
         int maxLevelIter = 0;
-        int maxIter = 128;
+        int maxIter = 64;
         int maxReflections = 1;
         int maxSubVoxelIter = 6;
         float reflectionRoughness = 0.02f;
@@ -118,6 +118,8 @@ namespace Test123Bruh {
         protected override void OnMouseWheel(MouseWheelEventArgs e) {
             base.OnMouseWheel(e);
             controller.MouseScroll(e.Offset);
+
+            movement.hFov -= e.OffsetY;
         }
 
         // Capture a screenshot and save to a folder next to the executable
@@ -164,33 +166,43 @@ namespace Test123Bruh {
                 "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position",
                 "Local Position", "Sub-voxel Local Position", "Scene Depth (log)", "Reprojected Scene Depth (log)" }, 12);
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
-            ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
-            ImGui.SliderInt("Max Sub-Voxel Iters", ref maxSubVoxelIter, 0, 6);
-            ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, voxel.levels - 1);
-            ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
-            ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 0.4f);
-            ImGui.ListBox("Resolution Scale-down Factor", ref scaleDownFactor, new string[] {
-                "1x (Native)", "2x", "4x",
-                "8x" }, 4);
-            ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
-            ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
-            ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
-            ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
-            ImGui.Checkbox("Hold Temporal Values?", ref holdTemporalValues);
-            ImGui.Text("Map Size: " + Voxel.MapSize);
-            ImGui.Text("Map Max Levels: " + voxel.levels);
-            ImGui.Text("Using Sparse Textures?: " + Voxel.SparseTextures);
-            ImGui.Text("Map Memory Usage (theoretical): " + (voxel.memoryUsage/(1024)) + "kb");
-            ImGui.Text("Actual Map Memory Usage (if sparse): " + ((voxel.memoryUsage-voxel.memoryUsageSparseReclaimed) / (1024)) + "kb");
+
+            if (ImGui.CollapsingHeader("Parameters, Limits & Optimizations")) {
+                ImGui.SliderFloat("Horizontal Fov", ref movement.hFov, 0.1f, 179f);
+                ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
+                ImGui.SliderInt("Max Sub-Voxel Iters", ref maxSubVoxelIter, 0, 6);
+                ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, voxel.levels - 1);
+                ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
+                ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 0.4f);
+                ImGui.ListBox("Resolution Scale-down Factor", ref scaleDownFactor, new string[] {
+                    "1x (Native)", "2x", "4x",
+                    "8x" }, 4);
+                ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
 
 
-            ImGui.Text("Sparse Reclaimed Memory Per Level");
-            ImGui.BeginChild("Scrolling");
-            for (int i = 0; i < voxel.levels; i++) {
-                ImGui.Text($"{i}: {voxel.memoryUsageSparseReclaimedPerLevel[i]/ 1024}kb");
+                ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
+                ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
+                ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
+                ImGui.Checkbox("Hold Temporal Values?", ref holdTemporalValues);
             }
-            
-            ImGui.EndChild();
+
+            if (ImGui.CollapsingHeader("Memory Usage")) {
+                ImGui.Text("Map Size: " + Voxel.MapSize);
+                ImGui.Text("Map Max Levels: " + voxel.levels);
+                ImGui.Text("Using Sparse Textures?: " + Voxel.SparseTextures);
+                ImGui.Text("Map Memory Usage (theoretical): " + (voxel.memoryUsage / (1024)) + "kb");
+                ImGui.Text("Actual Map Memory Usage (if sparse): " + ((voxel.memoryUsage - voxel.memoryUsageSparseReclaimed) / (1024)) + "kb");
+
+
+                ImGui.Text("Sparse Reclaimed Memory Per Level");
+                ImGui.BeginChild("Scrolling");
+                for (int i = 0; i < voxel.levels; i++) {
+                    ImGui.Text($"{i}: {voxel.memoryUsageSparseReclaimedPerLevel[i] / 1024}kb");
+                }
+
+                ImGui.EndChild();
+            }
+
             if (ImGui.CollapsingHeader("Last Temporal Depth Texture")) {
                 float scaleDownTest = 4.0f;
                 System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(0, 0.5f);
@@ -198,23 +210,24 @@ namespace Test123Bruh {
                 ImGui.Image((nint)lastDepthTemporal, new System.Numerics.Vector2(ClientSize.X, ClientSize.Y) / scaleDownTest, uv0, uv1);
             }
 
-            System.Numerics.Vector3 dir = ToVec3(lightDirection);
-            ImGui.SliderFloat3("Sun direction", ref dir, -1f, 1f);
-            FromVec3(dir, ref lightDirection);
+            if (ImGui.CollapsingHeader("Colors & Lighting")) {
+                System.Numerics.Vector3 dir = ToVec3(lightDirection);
+                ImGui.SliderFloat3("Sun direction", ref dir, -1f, 1f);
+                FromVec3(dir, ref lightDirection);
 
+                System.Numerics.Vector3 color = ToVec3(topColor);
+                ImGui.ColorPicker3("Top Color", ref color);
+                FromVec3(color, ref topColor);
 
-            System.Numerics.Vector3 color = ToVec3(topColor);
-            ImGui.ColorPicker3("Top Color", ref color);
-            FromVec3(color, ref topColor);
+                color = ToVec3(sideColor);
+                ImGui.ColorPicker3("Side Color", ref color);
+                FromVec3(color, ref sideColor);
 
-            color = ToVec3(sideColor);
-            ImGui.ColorPicker3("Side Color", ref color);
-            FromVec3(color, ref sideColor);
-
-            ImGui.SliderFloat("Ambient Strength", ref ambientStrength, 0.0f, 1.0f);
-            ImGui.SliderFloat("Normals Strength", ref normalMapStrength, 0.0f, 1.0f);
-            ImGui.SliderFloat("Gloss Strength", ref glossStrength, 0.0f, 1.0f);
-            ImGui.SliderFloat("Specular Strength", ref specularStrength, 0.0f, 1.0f);
+                ImGui.SliderFloat("Ambient Strength", ref ambientStrength, 0.0f, 1.0f);
+                ImGui.SliderFloat("Normals Strength", ref normalMapStrength, 0.0f, 1.0f);
+                ImGui.SliderFloat("Gloss Strength", ref glossStrength, 0.0f, 1.0f);
+                ImGui.SliderFloat("Specular Strength", ref specularStrength, 0.0f, 1.0f);
+            }
 
             ImGui.End();            
 
@@ -262,8 +275,8 @@ namespace Test123Bruh {
             int scaleDown = 1 << scaleDownFactor;
             movement.UpdateMatrices((float)(ClientSize.Y / scaleDown) / (float)(ClientSize.X / scaleDown), useTemporalReproOpt);
             GL.Uniform2(1, ClientSize.ToVector2() / scaleDown);
-            GL.UniformMatrix4(2, false, ref movement.viewMatrix);
-            GL.UniformMatrix4(3, false, ref movement.projMatrix);
+            GL.UniformMatrix4(2, true, ref movement.viewMatrix);
+            GL.UniformMatrix4(3, true, ref movement.projMatrix);
             GL.Uniform3(4, movement.position);
             GL.Uniform1(5, maxLevelIter);
             GL.Uniform1(6, maxIter);
@@ -276,7 +289,7 @@ namespace Test123Bruh {
             GL.Uniform1(13, useMipchainCacheOpt ? 1 : 0);
             GL.Uniform1(14, usePropagatedBoundsOpt ? 1 : 0);
             GL.Uniform1(15, maxSubVoxelIter);
-            GL.UniformMatrix4(16, false, ref lastFrameViewMatrix);
+            GL.UniformMatrix4(16, true, ref lastFrameViewMatrix);
             GL.Uniform1(17, (uint)frameCount);
             GL.Uniform1(18, useTemporalReproOpt ? 1 : 0);
             GL.Uniform3(19, lastPosition);

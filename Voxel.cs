@@ -15,7 +15,7 @@ namespace Test123Bruh {
         public int sparseHelper;
         public const bool SparseTextures = true;
         public const bool ListSparsePages = false;
-        public const int MapSize = 256;
+        public const int MapSize = 64;
         public const SizedInternalFormat Format = SizedInternalFormat.Rgba32ui;
         public int levels;
         public ulong memoryUsage = 0;
