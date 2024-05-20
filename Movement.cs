@@ -11,7 +11,7 @@ namespace Test123Bruh {
     internal class Movement {
         Quaternion rotation;
         public float smoothing = 20.0f;
-        public Vector3 position = new Vector3((float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f, (float)Voxel.size / 2.0f);
+        public Vector3 position = new Vector3((float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f);
         public Matrix4 projMatrix;
         public Matrix4 viewMatrix;
         Vector3 lastVelocity;

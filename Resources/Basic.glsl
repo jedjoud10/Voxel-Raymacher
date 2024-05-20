@@ -1,6 +1,10 @@
 ﻿
 #version 460
 #extension GL_ARB_gpu_shader_int64 : enable
+#extension GL_KHR_shader_subgroup_quad : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_arithmetic : enable
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(location = 1) uniform vec2 resolution;
 layout(location = 2) uniform mat4 view_matrix;
@@ -32,6 +36,7 @@ layout(location = 22) uniform float gloss_strength;
 layout(location = 23) uniform float specular_strength;
 layout(location = 24) uniform vec3 top_color;
 layout(location = 25) uniform vec3 side_color;
+layout(r32i, binding = 4) uniform iimage3D sparse_helper;
 
 #include Hashes.glsl
 #include Lighting.glsl
@@ -130,10 +135,13 @@ void main() {
 		// recursively go through the mip chain
 		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, level_cache);
 
+		//voxel_distance = subgroupMax(voxel_distance);
+
 		// gotta add a small offset since we'd be on the very face of the voxel
 		pos += ray_dir * max(0.001, voxel_distance);
 
 		// do all of our lighting calculations here
+		//subgroupBarrier();
 		if (temp_hit) {
 			temp_hit = false;
 
@@ -173,7 +181,7 @@ void main() {
 					}
 				}
 				*/
-
+				//subgroupBarrier();
 				color = lighting(pos, normal, ray_dir);
 
 				// dim the block faces if they are facing inside

@@ -62,4 +62,11 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir) {
 	//return diffuse + ambient * ambient_strength + vec3(gloss * gloss_strength) + vec3(specular * specular_strength);
 	vec3 outpute = 1.4 * diffuse * light + diffuse * ambient * ambient_strength + vec3(gloss * gloss_strength) + vec3(specular * specular_strength);
 	return outpute;
+	//return vec3(float(gl_SubgroupID) / float(gl_NumSubgroups));
+	/*
+	subgroupBarrier();
+	vec3 t = subgroupQuadSwapHorizontal(pos) - pos;
+	subgroupBarrier();
+	*/
+	//return vec3(-t * 100);
 }

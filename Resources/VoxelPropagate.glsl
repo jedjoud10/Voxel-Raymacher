@@ -1,9 +1,11 @@
 ﻿#version 460 core
-
+#extension GL_ARB_sparse_texture2 : enable
 layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 layout(rgba32ui, binding = 0, location = 0) uniform uimage3D last_voxels;
 layout(rgba32ui, binding = 1, location = 1) uniform uimage3D next_voxels;
-layout(location = 2) uniform int propagate_bounds;
+layout(r32i, binding = 2, location = 2) uniform iimage3D sparse_helper;
+layout(location = 3) uniform int propagate_bounds;
+layout(location = 4) uniform int page_size;
 
 void main() {
 	bool store_any = false;
@@ -16,11 +18,27 @@ void main() {
 		{
 			for (int z = 0; z < 2; z++)
 			{
-				uvec2 data = imageLoad(last_voxels, ivec3(gl_GlobalInvocationID * 2) + ivec3(x, y, z)).xy;
+				ivec3 pos = ivec3(gl_GlobalInvocationID * 2) + ivec3(x, y, z);
+				/*
+				uvec4 dataa = uvec4(0);
+				int code = sparseImageLoadARB(last_voxels, pos, dataa);
+				uvec2 data = dataa.xy;
+				*/
+				uvec2 data = imageLoad(last_voxels, pos).xy;
 				bool has_matter = (data.x > 0.0 || data.y > 0.0);
-				store_any = store_any || has_matter;
+				bool invis = false;
+
+				if (propagate_bounds == 1) {
+					invis = (data.x == 0 && data.y == 0);
+				}
+				else {
+					invis = (data.x == 0 && data.y == 0) || (data.x == 0xffffffff && data.y == 0xffffffff);
+				}
 
 				if (has_matter) {
+					store_any = true;
+					
+
 					if (propagate_bounds == 1) {
 						// convert the data (stored as bounds compared to mini-voxels)
 						// propagate these bounds to the current bounds
@@ -38,7 +56,14 @@ void main() {
 						bounds_min = min(bounds_min, position);
 						bounds_max = max(bounds_max, position);
 					}
-				}				
+				}
+				else {
+					
+				}
+
+				if (invis) {
+					imageAtomicAdd(sparse_helper, pos / page_size, 1);
+				}
 			}
 		}
 	}

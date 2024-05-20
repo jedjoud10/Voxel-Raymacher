@@ -23,7 +23,7 @@ namespace Test123Bruh {
         Skybox skybox = null;
         int lastDepthTemporal;
 
-        int maxLevelIter = Voxel.levels-1;
+        int maxLevelIter = 0;
         int maxIter = 128;
         int maxReflections = 1;
         int maxSubVoxelIter = 6;
@@ -93,6 +93,7 @@ namespace Test123Bruh {
             controller = new ImGuiController(ClientSize.X, ClientSize.Y);
             movement = new Movement();
             skybox = new Skybox();
+            maxLevelIter = voxel.levels - 1;
         }
 
         protected override void OnFramebufferResize(FramebufferResizeEventArgs e) {
@@ -163,7 +164,7 @@ namespace Test123Bruh {
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
             ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
             ImGui.SliderInt("Max Sub-Voxel Iters", ref maxSubVoxelIter, 0, 6);
-            ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, Voxel.levels - 1);
+            ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, voxel.levels - 1);
             ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
             ImGui.SliderFloat("Reflection Roughness", ref reflectionRoughness, 0.0f, 0.4f);
             ImGui.ListBox("Resolution Scale-down Factor", ref scaleDownFactor, new string[] {
@@ -173,9 +174,20 @@ namespace Test123Bruh {
             ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
             ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
             ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
-            ImGui.Text("Map Size: " + Voxel.size);
-            ImGui.Text("Map Max Levels: " + Voxel.levels);
-            ImGui.Text("Map Memory Usage: " + (voxel.memoryUsage/(1024*1024)) + "mb");
+            ImGui.Text("Map Size: " + Voxel.MapSize);
+            ImGui.Text("Map Max Levels: " + voxel.levels);
+            ImGui.Text("Using Sparse Textures?: " + Voxel.SparseTextures);
+            ImGui.Text("Map Memory Usage (theoretical): " + (voxel.memoryUsage/(1024)) + "kb");
+            ImGui.Text("Actual Map Memory Usage (if sparse): " + ((voxel.memoryUsage-voxel.memoryUsageSparseReclaimed) / (1024)) + "kb");
+
+
+            ImGui.Text("Sparse Reclaimed Memory Per Level");
+            ImGui.BeginChild("Scrolling");
+            for (int i = 0; i < voxel.levels; i++) {
+                ImGui.Text($"{i}: {voxel.memoryUsageSparseReclaimedPerLevel[i]/ 1024}kb");
+            }
+            
+            ImGui.EndChild();
             if (ImGui.CollapsingHeader("Last Temporal Depth Texture")) {
                 float scaleDownTest = 4.0f;
                 System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(0, 0.5f);
@@ -243,7 +255,7 @@ namespace Test123Bruh {
             GL.Uniform3(4, movement.position);
             GL.Uniform1(5, maxLevelIter);
             GL.Uniform1(6, maxIter);
-            GL.Uniform1(7, Voxel.size);
+            GL.Uniform1(7, Voxel.MapSize);
             GL.Uniform1(8, debugView);
             GL.Uniform1(9, maxReflections);
             GL.Uniform1(10, useSubVoxels ? 1 : 0);
@@ -267,6 +279,7 @@ namespace Test123Bruh {
             GL.BindImageTexture(1, lastDepthTemporal, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32f);
             GL.BindTextureUnit(2, voxel.texture);
             GL.BindTextureUnit(3, skybox.texture);
+            GL.BindTextureUnit(4, voxel.sparseHelper);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
 
