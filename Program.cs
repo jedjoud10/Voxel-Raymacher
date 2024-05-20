@@ -5,7 +5,7 @@ namespace Test123Bruh {
     internal class Program {
         static void Main(string[] args) {
             var windowSettings = new GameWindowSettings() {
-                //UpdateFrequency = 1000,
+                //UpdateFrequency = 10,
             };
             var nativeWindowSettings = new NativeWindowSettings() {
                 ClientSize = (800, 600),

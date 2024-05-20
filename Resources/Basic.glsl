@@ -23,7 +23,6 @@ layout(location = 14) uniform int use_prop_aabb_bounds;
 layout(location = 15) uniform int max_sub_voxel_iter;
 
 layout(rgba8, binding = 0) uniform image2D image;
-layout(r32f, binding = 1) uniform image2D temporal_depth;
 layout(binding = 2) uniform usampler3D voxels;
 layout(binding = 3) uniform samplerCube skybox;
 layout(location = 16) uniform mat4 last_frame_view_matrix;
@@ -38,6 +37,9 @@ layout(location = 24) uniform vec3 top_color;
 layout(location = 25) uniform vec3 side_color;
 layout(r32i, binding = 4) uniform iimage3D sparse_helper;
 layout(location = 26) uniform int hold_temporal_values;
+layout(r32f, binding = 1) uniform image2D new_temporal_depth;
+layout(binding = 5) uniform sampler2D last_temporal_depth;
+
 
 #include Hashes.glsl
 #include Lighting.glsl
@@ -50,19 +52,22 @@ void main() {
 	coords -= 1.0;
 
 	// apply projection transformations for ray 
-	vec4 ray_dir_test = inverse(proj_matrix) * vec4(coords, -1.0, 1.0);
-	ray_dir_test.w = 0.0;
-	ray_dir_test = inverse(view_matrix) * ray_dir_test;
-
-	// this should work??? why does it not work???
-	//vec4 lastuvst = (last_frame_view_matrix * vec4(ray_dir, 1.0));
-	vec4 lastuvst = (last_frame_view_matrix * vec4(ray_dir_test.xyz, 0.0));
-	lastuvst.w = 0.0;
-	vec4 exactsame = (proj_matrix * lastuvst);
-	exactsame.xy /= exactsame.w;
-
-	vec3 ray_dir = normalize(ray_dir_test.xyz);
+	vec4 ray_dir_non_normalized = inverse(proj_matrix) * vec4(coords, -1.0, 1.0);
+	ray_dir_non_normalized.w = 0.0;
+	ray_dir_non_normalized = inverse(view_matrix) * ray_dir_non_normalized;
+	vec3 ray_dir = normalize(ray_dir_non_normalized.xyz);
 	vec3 inv_dir = 1.0 / (ray_dir + vec3(0.0001));
+
+	// reproject the uvs using the last frame's view matrix
+	vec4 last_uvs_full = last_frame_view_matrix * vec4(ray_dir_non_normalized.xyz, 0.0);
+	last_uvs_full.w = 0.0;
+	last_uvs_full = (proj_matrix * last_uvs_full);
+	last_uvs_full.xy /= last_uvs_full.w;
+
+	// convert the [-1,1] range to [0,1] for texture sampling
+	vec2 last_uvs = last_uvs_full.xy;
+	last_uvs += 1;
+	last_uvs /= 2;
 
 	// ray marching stuff
 	vec3 pos = position;
@@ -80,51 +85,27 @@ void main() {
 	float min_level_reached = 1000;
 	int reflections_iters = 0;
 	float factor = 1.0;
-
-	// what the FUCK is this constant???
-	// only works for y fov at 80
-
-	vec2 lastuvs = lastuvst.xy / (-lastuvst.z);
-	//vec2 lastuvs = lastuvst.xy / (-lastuvst.z);
-	float magic_fucking_fov_number_PLEASE_HELP = 0.841;
-	//lastuvs *= (resolution.yx / resolution.x);
-
-	// convert the [-1,1] range to [0,1] for texture sampling
-	lastuvs = exactsame.xy;
-	lastuvs += 1;
-	lastuvs /= 2;
-
-	//lastuvst /= -lastuvst.z;
-
-	/*
-	if (exactsame.x > -1 && exactsame.y > -1 && exactsame.x < 1 && exactsame.y < 1) {
-		imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(exactsame.xy, 0, 1.0));
-	}
-	else {
-		imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(0, 0, 0, 1.0));
-	}
-	return;
-	*/
-
 	
-	ivec2 pixelu = ivec2(lastuvs * resolution);
-	
-	if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && lastuvst.z < 0 && use_temporal_depth == 1) {
+	ivec2 pixelu = ivec2(last_uvs * resolution);
+	float min_depth = 10000;
+	if (last_uvs.x > 0 && last_uvs.y > 0 && last_uvs.x < 1 && last_uvs.y < 1 && last_uvs_full.w > 0) {
 		// WARNING: This WILL NOT work with reflections because pos would be the reflected pos, making the ray overshoot really far
-		float min_depth = 10000;
-
+		//min_depth = texture(last_temporal_depth, last_uvs/2.0).x;
+		
 		int scaler = 2;
 		for (int x = -scaler; x <= scaler; x++)
 		{
 			for (int y = -scaler; y <= scaler; y++)
 			{
-				float last_depth = imageLoad(temporal_depth, pixelu + ivec2(x,y) * 3).x;
+				float last_depth = texture(last_temporal_depth, (last_uvs + vec2(x,y) * 0.002) / 2.0).x;
 				min_depth = min(last_depth, min_depth);
 			}
 		}
 
 		// add margin if we are moving in the direction of the ray
-		pos += ray_dir * (min_depth - 0.01);
+		if (use_temporal_depth == 1) {
+			pos += ray_dir * (min_depth - 0.01);
+		}
 	}
 
 	vec3 first_touched_pos = vec3(0);
@@ -248,13 +229,8 @@ void main() {
 		color = vec3(log(depth) / 5, 0, 0);
 	}
 	else if (debug_view == 11) {
-		float repr_depth = 0;
-		color = vec3(0);
-		if (lastuvs.x > 0 && lastuvs.y > 0 && lastuvs.x < 1 && lastuvs.y < 1 && lastuvst.z < 0) {
-			repr_depth = imageLoad(temporal_depth, pixelu).x;
-			color = vec3(log(repr_depth) / 5, 0, 0);
-			//color = vec3(lastuvs, 0);
-		}
+		color = vec3(log(min_depth) / 5, 0, 0);
+		//color = vec3(last_uvs.xy, 0);
 	}
 
 	if (!hit && reflections_iters == 0) {
@@ -264,7 +240,8 @@ void main() {
 	// store the value in the image that we will blit
 	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 
+	memoryBarrier();
 	if (hold_temporal_values == 0) {
-		imageStore(temporal_depth, ivec2(gl_GlobalInvocationID.xy), vec4(depth, 0, 0, 1.0));
+		imageStore(new_temporal_depth, ivec2(gl_GlobalInvocationID.xy), vec4(depth, 0, 0, 1.0));
 	}
 }

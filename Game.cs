@@ -21,7 +21,8 @@ namespace Test123Bruh {
         Voxel voxel = null;
         Movement movement = null;
         Skybox skybox = null;
-        int lastDepthTemporal;
+        int depthTex0;
+        int depthTex1;
 
         int maxLevelIter = 0;
         int maxIter = 64;
@@ -83,7 +84,8 @@ namespace Test123Bruh {
             GL.Enable(EnableCap.DebugOutputSynchronous);
 
             screenTexture = CreateScreenTex(SizedInternalFormat.Rgba8);
-            lastDepthTemporal = CreateScreenTex(SizedInternalFormat.R32f);
+            depthTex0 = CreateScreenTex(SizedInternalFormat.R32f);
+            depthTex1 = CreateScreenTex(SizedInternalFormat.R32f);
 
             fbo = GL.GenFramebuffer();
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
@@ -103,7 +105,8 @@ namespace Test123Bruh {
             GL.DeleteTexture(screenTexture);
 
             screenTexture = CreateScreenTex(SizedInternalFormat.Rgba8);
-            lastDepthTemporal = CreateScreenTex(SizedInternalFormat.R32f);
+            depthTex0 = CreateScreenTex(SizedInternalFormat.R32f);
+            depthTex1 = CreateScreenTex(SizedInternalFormat.R32f);
 
             GL.NamedFramebufferTexture(fbo, FramebufferAttachment.ColorAttachment0, screenTexture, 0);
             GL.Viewport(0, 0, e.Width, e.Height);
@@ -207,7 +210,7 @@ namespace Test123Bruh {
                 float scaleDownTest = 4.0f;
                 System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(0, 0.5f);
                 System.Numerics.Vector2 uv1 = new System.Numerics.Vector2(1, 0) / 2.0f;
-                ImGui.Image((nint)lastDepthTemporal, new System.Numerics.Vector2(ClientSize.X, ClientSize.Y) / scaleDownTest, uv0, uv1);
+                //ImGui.Image((nint)lastDepthTemporal, new System.Numerics.Vector2(ClientSize.X, ClientSize.Y) / scaleDownTest, uv0, uv1);
             }
 
             if (ImGui.CollapsingHeader("Colors & Lighting")) {
@@ -270,6 +273,17 @@ namespace Test123Bruh {
             }
             */
 
+            int readDepth;
+            int writeDepth;
+
+            if ((frameCount % 2) == 0) {
+                readDepth = depthTex0;
+                writeDepth = depthTex1;
+            } else {
+                readDepth = depthTex1;
+                writeDepth = depthTex0;
+            }
+
             // Bind compute shader and execute it
             GL.UseProgram(compute.program);
             int scaleDown = 1 << scaleDownFactor;
@@ -302,10 +316,11 @@ namespace Test123Bruh {
             GL.Uniform1(26, holdTemporalValues ? 1 : 0);
 
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
-            GL.BindImageTexture(1, lastDepthTemporal, 0, false, 0, TextureAccess.ReadWrite, SizedInternalFormat.R32f);
+            GL.BindImageTexture(1, writeDepth, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32f);
             GL.BindTextureUnit(2, voxel.texture);
             GL.BindTextureUnit(3, skybox.texture);
             GL.BindTextureUnit(4, voxel.sparseHelper);
+            GL.BindTextureUnit(5, readDepth);
             int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
             int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
 

@@ -15,7 +15,7 @@ namespace Test123Bruh {
         public int sparseHelper;
         public const bool SparseTextures = true;
         public const bool ListSparsePages = false;
-        public const int MapSize = 256;
+        public const int MapSize = 64;
         public const SizedInternalFormat Format = SizedInternalFormat.Rgba32ui;
         public int levels;
         public ulong memoryUsage = 0;
@@ -30,7 +30,7 @@ namespace Test123Bruh {
          * 
          * Speed optimizations:
          * Optimize iteration using subgroup shenanigans?
-         * Temporal depth reprojection from last frame (use it as "starting point" for iter) (DONE, but buggy)
+         * Temporal depth reprojection from last frame (use it as "starting point" for iter) (DONE, but buggy. Also only works with rotational repr rn)
          * AABB tree for node sizes 1 and larger (DONE)
          * AABB Bounds for sub-voxels, pre-calculated for EVERY possible sub-voxel combination. At runtime would just fetch the bounds from a texture maybe?
             * Bounds are symmetric in someways so we don't need to store *all* information really. Could be really optimized
