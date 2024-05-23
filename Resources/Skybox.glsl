@@ -20,8 +20,9 @@ void main() {
     vec3 b1 = vec3(191, 230, 255) / 255.0;
     vec3 b2 = vec3(99, 194, 255) / 255.0;
     vec3 b3 = vec3(19, 65, 138) / 255.0;
-    vec3 color = mix(b1, b2, normal.y);
-    color = mix(color, b3, clamp(normal.y * 0.8 - 0.85, 0, 1));
+    vec3 color = mix(b1, b2, normal.y + snoise(normal * 4) * 0.1);
+    color = mix(color, b3, clamp(normal.y * 0.8 - 0.85 + snoise(normal * 5) * 0.05, 0, 1));
+    color += mix(-snoise(normal * 3.0 * vec3(1, 0, 1)), 0, clamp(1-normal.y, 0, 1)) * 0.05;
     //color = mix(color, vec3(0.1), clamp(-normal.y*30-0.,0,1));
 
 	imageStore(skybox, ivec3(gl_GlobalInvocationID.xy, side), vec4(color, 0.0));

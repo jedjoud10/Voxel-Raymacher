@@ -39,6 +39,7 @@ layout(r32i, binding = 4) uniform iimage3D sparse_helper;
 layout(location = 26) uniform int hold_temporal_values;
 layout(r32f, binding = 1) uniform image2D new_temporal_depth;
 layout(binding = 5) uniform sampler2D last_temporal_depth;
+layout(location = 27) uniform float scale_factor;
 
 
 #include Hashes.glsl
@@ -87,22 +88,18 @@ void main() {
 	float factor = 1.0;
 	
 	ivec2 pixelu = ivec2(last_uvs * resolution);
-	float min_depth = 10000;
+	float min_depth = 100000;
 	if (last_uvs.x > 0 && last_uvs.y > 0 && last_uvs.x < 1 && last_uvs.y < 1 && last_uvs_full.w > 0) {
-		// WARNING: This WILL NOT work with reflections because pos would be the reflected pos, making the ray overshoot really far
-		//min_depth = texture(last_temporal_depth, last_uvs/2.0).x;
-		
 		int scaler = 2;
 		for (int x = -scaler; x <= scaler; x++)
 		{
 			for (int y = -scaler; y <= scaler; y++)
 			{
-				float last_depth = texture(last_temporal_depth, (last_uvs + vec2(x,y) * 0.002) / 2.0).x;
+				float last_depth = texture(last_temporal_depth, (last_uvs + vec2(x,y) * 0.003 + 0.003) / scale_factor).x;
 				min_depth = min(last_depth, min_depth);
 			}
 		}
 
-		// add margin if we are moving in the direction of the ray
 		if (use_temporal_depth == 1) {
 			pos += ray_dir * (min_depth - 0.01);
 		}
@@ -152,7 +149,8 @@ void main() {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
 						ray_dir = reflect(ray_dir, normal);
-						ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
+						ray_dir += (hash33(floor(pos*4) / 4) - 0.5) * reflection_roughness;
+						//ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
 						ray_dir = normalize(ray_dir);
 						inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 						level_cache = 0;
@@ -230,7 +228,6 @@ void main() {
 	}
 	else if (debug_view == 11) {
 		color = vec3(log(min_depth) / 5, 0, 0);
-		//color = vec3(last_uvs.xy, 0);
 	}
 
 	if (!hit && reflections_iters == 0) {
@@ -240,7 +237,6 @@ void main() {
 	// store the value in the image that we will blit
 	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 
-	memoryBarrier();
 	if (hold_temporal_values == 0) {
 		imageStore(new_temporal_depth, ivec2(gl_GlobalInvocationID.xy), vec4(depth, 0, 0, 1.0));
 	}

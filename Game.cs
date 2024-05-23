@@ -206,12 +206,14 @@ namespace Test123Bruh {
                 ImGui.EndChild();
             }
 
+            /*
             if (ImGui.CollapsingHeader("Last Temporal Depth Texture")) {
                 float scaleDownTest = 4.0f;
                 System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(0, 0.5f);
                 System.Numerics.Vector2 uv1 = new System.Numerics.Vector2(1, 0) / 2.0f;
                 //ImGui.Image((nint)lastDepthTemporal, new System.Numerics.Vector2(ClientSize.X, ClientSize.Y) / scaleDownTest, uv0, uv1);
             }
+            */
 
             if (ImGui.CollapsingHeader("Colors & Lighting")) {
                 System.Numerics.Vector3 dir = ToVec3(lightDirection);
@@ -314,6 +316,7 @@ namespace Test123Bruh {
             GL.Uniform3(24, topColor);
             GL.Uniform3(25, sideColor);
             GL.Uniform1(26, holdTemporalValues ? 1 : 0);
+            GL.Uniform1(27, (float)scaleDown);
 
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             GL.BindImageTexture(1, writeDepth, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32f);

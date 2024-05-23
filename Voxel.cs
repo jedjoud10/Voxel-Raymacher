@@ -15,6 +15,8 @@ namespace Test123Bruh {
         public int sparseHelper;
         public const bool SparseTextures = true;
         public const bool ListSparsePages = false;
+
+        // fixme: SOMETIMES JUST DOESNT FUCKING WORK WHYYYg
         public const int MapSize = 64;
         public const SizedInternalFormat Format = SizedInternalFormat.Rgba32ui;
         public int levels;
@@ -41,6 +43,7 @@ namespace Test123Bruh {
          * Run low-res "pre-render" thingy that will cache minimum required depths (using ray thickness or cone instead of ray)
          * Use bitwise stuff for acceleration levels (nah)
          * Keep history of local child indices of un-hit child to avoid retracing from the top (DONE)
+            * Doesn't really work with sparse textures now since the max level is already limited 
         */
 
         static Vector3i[] GetPageSizesFor3DFormat(SizedInternalFormat format) {

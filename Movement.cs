@@ -10,8 +10,8 @@ using System.Threading.Tasks;
 namespace Test123Bruh {
     internal class Movement {
         Quaternion rotation = Quaternion.Identity;
-        public float smoothing = 15.0f;
-        public float hFov = 80.0f;
+        public float smoothing = 10.0f;
+        public float hFov = 60.0f;
         public Vector3 position = new Vector3((float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f, (float)Voxel.MapSize / 2.0f);
         public Matrix4 projMatrix;
         public Matrix4 viewMatrix;
