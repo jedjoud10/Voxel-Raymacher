@@ -17,6 +17,9 @@ namespace Test123Bruh {
         public Matrix4 viewMatrix;
         Vector3 lastVelocity;
         Vector2 mousePosTest;
+        Vector3 forward;
+        Vector3 side;
+        Vector3 up;
         Random rng = new Random();
 
         // Moves the player position and handles rotation
@@ -26,8 +29,9 @@ namespace Test123Bruh {
             Quaternion newRotation = Quaternion.FromAxisAngle(Vector3.UnitY, -mousePosTest.X) * Quaternion.FromAxisAngle(Vector3.UnitX, -mousePosTest.Y);
             rotation = Quaternion.Slerp(rotation, newRotation, MathHelper.Clamp(smoothing * delta * 5, 0f, 1f));
 
-            Vector3 forward = Vector3.Transform(-Vector3.UnitZ, rotation);
-            Vector3 side = Vector3.Transform(Vector3.UnitX, rotation);
+            forward = Vector3.Transform(-Vector3.UnitZ, rotation);
+            side = Vector3.Transform(Vector3.UnitX, rotation);
+            up = Vector3.Transform(Vector3.UnitY, rotation);
 
             // Update position and rotation
             float speed = keyboard.IsKeyDown(Keys.LeftControl) ? 1.0f : 30.0f;
@@ -52,7 +56,8 @@ namespace Test123Bruh {
         // Create a rotation and position matrix based on current rotation and position
         public void UpdateMatrices(float ratio, bool rando) {
             Quaternion randoRot = rando ? Quaternion.FromEulerAngles(rng.NextSingle() * 0.001f, rng.NextSingle() * 0.001f, 0.0f) : Quaternion.Identity;
-            viewMatrix = Matrix4.CreateFromQuaternion(rotation);
+            viewMatrix = Matrix4.CreateFromQuaternion(rotation) * Matrix4.CreateTranslation(position);
+            //viewMatrix = Matrix4.LookAt(position, position + forward, -up);
 
             float yFov = 2.0f * MathF.Atan(MathF.Tan(MathHelper.DegreesToRadians(hFov) / 2.0f) * (1.0f/ratio));
             projMatrix = Matrix4.CreatePerspectiveFieldOfView(MathHelper.Clamp(yFov, 0.001f, 1.99f * MathF.PI), 1.0f/ratio, 1.0f, 100.0f);

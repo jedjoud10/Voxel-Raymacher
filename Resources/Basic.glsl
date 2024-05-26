@@ -45,6 +45,7 @@ layout(location = 27) uniform float scale_factor;
 #include Hashes.glsl
 #include Lighting.glsl
 #include Intersections.glsl
+#include Noise.glsl
 
 void main() {
 	// remap coords to ndc range (-1, 1)
@@ -87,8 +88,9 @@ void main() {
 	int reflections_iters = 0;
 	float factor = 1.0;
 	
-	ivec2 pixelu = ivec2(last_uvs * resolution);
 	float min_depth = 100000;
+	min_depth = texture(last_temporal_depth, last_uvs / scale_factor).x;
+	/*
 	if (last_uvs.x > 0 && last_uvs.y > 0 && last_uvs.x < 1 && last_uvs.y < 1 && last_uvs_full.w > 0) {
 		int scaler = 2;
 		for (int x = -scaler; x <= scaler; x++)
@@ -104,6 +106,7 @@ void main() {
 			pos += ray_dir * (min_depth - 0.01);
 		}
 	}
+	*/
 
 	vec3 first_touched_pos = vec3(0);
 	for (int i = 0; i < max_iters; i++) {
@@ -149,8 +152,10 @@ void main() {
 					if (reflections_iters < max_reflections) {
 						//ray_dir = refract(ray_dir, normal, 1.4);
 						ray_dir = reflect(ray_dir, normal);
-						ray_dir += (hash33(floor(pos*4) / 4) - 0.5) * reflection_roughness;
+						//ray_dir += (hash33(floor(pos*4) / 4) - 0.5) * reflection_roughness;
 						//ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
+						//ray_dir += vec3(snoise(pos * 0.4 + vec3(pos * 0.2) * 0.8) * reflection_roughness);
+						ray_dir += vec3(fbm(pos * 0.4, 3, 0.5, 1.3) * reflection_roughness);
 						ray_dir = normalize(ray_dir);
 						inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 						level_cache = 0;

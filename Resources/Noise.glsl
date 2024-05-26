@@ -290,3 +290,18 @@ float snoise(vec3 v)
 	return 105.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1),
 		dot(p2, x2), dot(p3, x3)));
 }
+
+// fBM noise, uses 3D simplex noise
+float fbm(vec3 pos, uint octaves, float persistence, float lacunarity) {
+	float final = 0.0;
+	float scale = 1.0;
+	float amplitude = 1.0;
+
+	for (uint i = 0; i < octaves; i++) {
+		final += snoise(pos * scale + random3(float(i))) * amplitude;
+		scale *= lacunarity;
+		amplitude *= persistence;
+	}
+
+	return final;
+}

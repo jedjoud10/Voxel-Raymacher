@@ -35,9 +35,9 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir) {
 	smooth_normal = normalize(smooth_normal);
 	vec3 internal = floor(pos * 4.0) / 4.0;
 	*/
-	//vec3 rand = vec3(hash13(larger) * 0.1 + hash13(medium) * 0.2 + 0.7) * (hash33(small)-0.5)*2;
-	//normal += rand * normal_map_strength;
-	//normal = normalize(normal);
+	vec3 rand = vec3(hash13(larger) * 0.1 + hash13(medium) * 0.2 + 0.7) * (hash33(small)-0.5)*2;
+	normal += rand * normal_map_strength;
+	normal = normalize(normal);
 
 	vec3 diffuse = normal.y > 0.5 ? top_color : side_color;
 	//diffuse *= (hash13(medium) * 0.2 + 0.7) * (hash33(small) - 0.5) * 2;

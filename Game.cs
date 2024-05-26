@@ -42,7 +42,7 @@ namespace Test123Bruh {
         bool holdTemporalValues = false;
 
         float ambientStrength = 0.4f;
-        float normalMapStrength = 0.0f;
+        float normalMapStrength = 0.2f;
         float glossStrength = 0.4f;
         float specularStrength = 0.1f;
         Vector3 topColor = new Vector3(4, 117, 30) / 255.0f;
@@ -266,14 +266,17 @@ namespace Test123Bruh {
             if (KeyboardState.IsKeyPressed(Keys.F4)) {
                 CursorState = 2 - CursorState;
             }
-
             /*
             if (KeyboardState.IsKeyDown(Keys.F2)) {
                 debugView = 11;
             } else {
                 debugView = 10;
             }
-            */
+                */
+
+            if (KeyboardState.IsKeyPressed(Keys.F1)) {
+                holdTemporalValues = !holdTemporalValues;
+            }
 
             int readDepth;
             int writeDepth;
