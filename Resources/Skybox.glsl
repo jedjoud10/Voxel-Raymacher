@@ -6,6 +6,9 @@ layout(rgba8, binding = 0, location = 0) uniform imageCube skybox;
 layout(location = 1) uniform mat4 proj_view_matrix;
 layout(location = 2) uniform int resolution;
 layout(location = 3) uniform int side;
+layout(location = 4) uniform float time;
+layout(location = 5) uniform vec3 sun;
+
 
 void main() {
     // convert coordinates to -1 - 1 coordinates
@@ -15,14 +18,25 @@ void main() {
 
     // convert the NDC coordinate to a world space normal 
     vec3 normal = normalize((proj_view_matrix * vec4(ndc, 0)).xyz);
+    normal.z *= -1;
 
     // some very cool lighting calculations
     vec3 b1 = vec3(191, 230, 255) / 255.0;
     vec3 b2 = vec3(99, 194, 255) / 255.0;
     vec3 b3 = vec3(19, 65, 138) / 255.0;
+    
+    /*
+    vec3 b1 = vec3(82, 19, 171) / 255.0;
+    vec3 b2 = vec3(194, 83, 39) / 255.0;
+    vec3 b3 = vec3(194, 80, 39) / 255.0;
+    */
     vec3 color = mix(b1, b2, normal.y + snoise(normal * 4) * 0.1);
-    color = mix(color, b3, clamp(normal.y * 0.8 - 0.85 + snoise(normal * 5) * 0.05, 0, 1));
-    color += mix(-snoise(normal * 3.0 * vec3(1, 0, 1)), 0, clamp(1-normal.y, 0, 1)) * 0.05;
+    color = mix(color, b3, clamp(normal.y * 0.8 - 0.85 + snoise(normal * 5 - vec3(1,0,1) * time * 1) * 0.05, 0, 1));
+    color += mix(-snoise(normal * 3.0 * vec3(1, 0, 1) + time * 1.2), 0, clamp(1-normal.y, 0, 1)) * 0.05;
+    
+    float bruh = dot(normal, normalize(sun));
+    color += vec3(pow(max(bruh-0.1, 0), 16));
+
     //color = mix(color, vec3(0.1), clamp(-normal.y*30-0.,0,1));
 
 	imageStore(skybox, ivec3(gl_GlobalInvocationID.xy, side), vec4(color, 0.0));

@@ -76,7 +76,7 @@ void main() {
 	vec2 test_test_dists = intersection(position, ray_dir, inv_dir, vec3(0), vec3(map_size));
 	float step_size = test_test_dists.y / float(total_steps);
 	//step_size += 0.5;
-	float step_size_offset_factor = 1.2;
+	float step_size_offset_factor = 1.0;
 	float total_repro_steps_percent_taken = 1.0;
 
 	if (use_positional_repro == 1 && use_temporal_depth == 1) {
@@ -262,6 +262,10 @@ void main() {
 					}
 				}
 
+				// lod kinda?
+				float lod = 1.0 / distance(pos, position);
+				lod = clamp(lod, 0, 1);
+				lod = 0;
 				color = lighting(pos, normal, ray_dir);
 
 				// dim the block faces if they are facing inside

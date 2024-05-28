@@ -47,11 +47,12 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir) {
 	float light = clamp(dot(normal, light_dir), 0, 1);
 
 	// ambient
-	vec3 ambient = sky(ray_dir);
+	vec3 ambient = sky(normal);
 
 	// gloss
-	float gloss = 1 - dot(reflect(ray_dir, normal), normal);
-	gloss = max(pow(gloss, 3), 0);
+	float gloss_factor = 1 - dot(reflect(ray_dir, normal), normal);
+	gloss_factor = max(pow(gloss_factor, 3), 0);
+	vec3 gloss = vec3(gloss_factor);
 
 	// specular
 	vec3 hw = normalize(light_dir - ray_dir);
@@ -60,7 +61,7 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir) {
 	//return gloss;
 	//return diffuse;
 	//return diffuse + ambient * ambient_strength + vec3(gloss * gloss_strength) + vec3(specular * specular_strength);
-	vec3 outpute = 1.4 * diffuse * light + diffuse * ambient * ambient_strength + vec3(gloss * gloss_strength) + vec3(specular * specular_strength);
+	vec3 outpute = 1.4 * diffuse * light + diffuse * ambient * ambient_strength + gloss * gloss_strength + vec3(specular * specular_strength);
 	return outpute;
 	//return vec3(float(gl_SubgroupID) / float(gl_NumSubgroups));
 	/*

@@ -42,12 +42,13 @@ namespace Test123Bruh {
         Vector3 lastPosition = Vector3.Zero;
         bool holdTemporalValues = false;
 
-        float ambientStrength = 0.4f;
-        float normalMapStrength = 0.2f;
-        float glossStrength = 0.4f;
+        float ambientStrength = 0.8f;
+        float normalMapStrength = 0.1f;
+        float glossStrength = 0.2f;
         float specularStrength = 0.1f;
         Vector3 topColor = new Vector3(4, 117, 30) / 255.0f;
         Vector3 sideColor = new Vector3(69, 46, 21) / 255.0f;
+        float timeElapsed = 0.0f;
         
         private static void OnDebugMessage(
             DebugSource source,     // Source of the debugging message.
@@ -96,7 +97,7 @@ namespace Test123Bruh {
             voxel = new Voxel();
             controller = new ImGuiController(ClientSize.X, ClientSize.Y);
             movement = new Movement();
-            skybox = new Skybox();
+            skybox = new Skybox(lightDirection);
             maxLevelIter = voxel.levels - 1;
         }
 
@@ -122,8 +123,6 @@ namespace Test123Bruh {
         protected override void OnMouseWheel(MouseWheelEventArgs e) {
             base.OnMouseWheel(e);
             controller.MouseScroll(e.Offset);
-
-            //movement.hFov -= e.OffsetY;
         }
 
         // Capture a screenshot and save to a folder next to the executable
@@ -213,15 +212,6 @@ namespace Test123Bruh {
                 ImGui.EndChild();
             }
 
-            /*
-            if (ImGui.CollapsingHeader("Last Temporal Depth Texture")) {
-                float scaleDownTest = 4.0f;
-                System.Numerics.Vector2 uv0 = new System.Numerics.Vector2(0, 0.5f);
-                System.Numerics.Vector2 uv1 = new System.Numerics.Vector2(1, 0) / 2.0f;
-                //ImGui.Image((nint)lastDepthTemporal, new System.Numerics.Vector2(ClientSize.X, ClientSize.Y) / scaleDownTest, uv0, uv1);
-            }
-            */
-
             if (ImGui.CollapsingHeader("Colors & Lighting")) {
                 System.Numerics.Vector3 dir = ToVec3(lightDirection);
                 ImGui.SliderFloat3("Sun direction", ref dir, -1f, 1f);
@@ -253,6 +243,7 @@ namespace Test123Bruh {
             float delta = (float)args.Time;
             frameGraphData[frameCount % 512] = delta;
 
+            skybox.Update(timeElapsed, lightDirection, (int)(frameCount % 6));
             controller.Update(this, delta);
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             GL.ClearColor(new Color4(0, 32, 48, 255));
@@ -358,6 +349,7 @@ namespace Test123Bruh {
 
             ImGuiController.CheckGLError("End of frame");
             SwapBuffers();
+            timeElapsed += delta;
         }
     }
 }
