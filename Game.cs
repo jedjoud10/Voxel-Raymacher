@@ -34,6 +34,7 @@ namespace Test123Bruh {
         bool useMipchainCacheOpt = false;
         bool usePropagatedBoundsOpt = false;
         bool useTemporalReproOpt = false;
+        bool usePositionalTemporalReproOpt = false;
         ulong frameCount = 0;
         Vector3 lightDirection = new Vector3(1f, 1f, 1f);
         float[] frameGraphData = new float[512];
@@ -167,7 +168,7 @@ namespace Test123Bruh {
             ImGui.ListBox("Debug View Type", ref debugView, new string[] {
                 "Non-Debug", "Map intersection normal", "Total iterations",
                 "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position",
-                "Local Position", "Sub-voxel Local Position", "Scene Depth (log)", "Reprojected Scene Depth (log)" }, 12);
+                "Local Position", "Sub-voxel Local Position", "Scene Depth (log)", "Reprojected Scene Depth (log)", "Min Depth Taken For Repro", "Total Reprojection Steps Taken (percent)" }, 14);
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
 
             if (ImGui.CollapsingHeader("Parameters, Limits & Optimizations")) {
@@ -186,6 +187,12 @@ namespace Test123Bruh {
                 ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
                 ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
                 ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
+
+                if (!useTemporalReproOpt)
+                    ImGui.BeginDisabled();
+                ImGui.Checkbox("Use Positional Reprojection ?", ref usePositionalTemporalReproOpt);
+                if (!useTemporalReproOpt)
+                    ImGui.EndDisabled();
                 ImGui.Checkbox("Hold Temporal Values?", ref holdTemporalValues);
             }
 
@@ -266,14 +273,15 @@ namespace Test123Bruh {
             if (KeyboardState.IsKeyPressed(Keys.F4)) {
                 CursorState = 2 - CursorState;
             }
+
             /*
             if (KeyboardState.IsKeyDown(Keys.F2)) {
                 debugView = 11;
             } else {
                 debugView = 10;
             }
-                */
-
+            */
+                
             if (KeyboardState.IsKeyPressed(Keys.F1)) {
                 holdTemporalValues = !holdTemporalValues;
             }
@@ -320,6 +328,7 @@ namespace Test123Bruh {
             GL.Uniform3(25, sideColor);
             GL.Uniform1(26, holdTemporalValues ? 1 : 0);
             GL.Uniform1(27, (float)scaleDown);
+            GL.Uniform1(28, usePositionalTemporalReproOpt ? 1 : 0);
 
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             GL.BindImageTexture(1, writeDepth, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32f);

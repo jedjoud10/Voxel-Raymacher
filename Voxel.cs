@@ -17,7 +17,7 @@ namespace Test123Bruh {
         public const bool ListSparsePages = false;
 
         // fixme: SOMETIMES JUST DOESNT FUCKING WORK WHYYYg
-        public const int MapSize = 64;
+        public const int MapSize = 256;
         public const SizedInternalFormat Format = SizedInternalFormat.Rgba32ui;
         public int levels;
         public ulong memoryUsage = 0;

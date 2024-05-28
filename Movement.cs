@@ -22,6 +22,10 @@ namespace Test123Bruh {
         Vector3 up;
         Random rng = new Random();
 
+        float nfmod(float a, float b) {
+            return a - b * MathF.Floor(a / b);
+        }
+
         // Moves the player position and handles rotation
         public void Move(MouseState mouse, KeyboardState keyboard, float delta) {
             //mousePosTest += Vector2.Clamp(mouse.Delta, -Vector2.One * 200, Vector2.One * 200) * 0.0005f;
@@ -51,6 +55,10 @@ namespace Test123Bruh {
 
             lastVelocity = Vector3.Lerp(lastVelocity, velocity * speed, MathHelper.Clamp(delta * smoothing, 0f, 1f));
             position += lastVelocity * delta;
+
+            position.X = nfmod(position.X, (float)Voxel.MapSize);
+            position.Y = nfmod(position.Y, (float)Voxel.MapSize);
+            position.Z = nfmod(position.Z, (float)Voxel.MapSize);
         }
 
         // Create a rotation and position matrix based on current rotation and position

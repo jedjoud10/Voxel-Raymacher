@@ -40,6 +40,7 @@ layout(location = 26) uniform int hold_temporal_values;
 layout(r32f, binding = 1) uniform image2D new_temporal_depth;
 layout(binding = 5) uniform sampler2D last_temporal_depth;
 layout(location = 27) uniform float scale_factor;
+layout(location = 28) uniform int use_positional_repro;
 
 
 #include Hashes.glsl
@@ -60,11 +61,95 @@ void main() {
 	vec3 ray_dir = normalize(ray_dir_non_normalized.xyz);
 	vec3 inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 
+	// for positional reprojection
+	// start at new position, ray-march towards the current ray dir
+	// at each position check if the pos is inside the last frame's cam matrix (repro & check if uvs are valid, store depth in d0)
+	//   do this by finding ray dir using last frame pos and current step pos
+	// if valid, get depth using last frame's depth texture
+	// compare this depth to what would be seen from last frame's camera at that point's depth (store in d0)
+	//
+	vec3 repr_pos = position + ray_dir;
+	vec3 bruhtu = vec3(0.0);
+	float pos_reprojected_depth = 0.0;
+	int total_steps = 32;
+
+	vec2 test_test_dists = intersection(position, ray_dir, inv_dir, vec3(0), vec3(map_size));
+	float step_size = test_test_dists.y / float(total_steps);
+	//step_size += 0.5;
+	float step_size_offset_factor = 1.2;
+	float total_repro_steps_percent_taken = 1.0;
+
+	if (use_positional_repro == 1 && use_temporal_depth == 1) {
+		for (int i = 0; i < total_steps; i++)
+		{
+			vec3 temp_ray_dir = repr_pos - last_position;
+			vec4 test_uvs = (proj_matrix * last_frame_view_matrix) * vec4(temp_ray_dir, 0.0);
+			test_uvs.xyz /= test_uvs.w;
+			vec2 test_uvs2 = test_uvs.xy;
+			test_uvs2 += 1;
+			test_uvs2 /= 2;
+
+			if (test_uvs2.x > 0 && test_uvs2.y > 0 && test_uvs2.x < 1 && test_uvs2.y < 1 && test_uvs.w > 0) {
+				//float od = texture(last_temporal_depth, test_uvs2 / scale_factor).x;
+
+				float od = 10000.0;
+				int scaler = 1;
+				for (int x = -scaler; x <= scaler; x++)
+				{
+					for (int y = -scaler; y <= scaler; y++)
+					{
+						float last_depth = texture(last_temporal_depth, (test_uvs2 + vec2(x, y) * 0.003) / scale_factor).x;
+						od = min(last_depth, od);
+					}
+				}
+
+
+				float nd = distance(last_position, repr_pos);
+				if (od < nd) {
+					float act_act_min_depth = distance(position, repr_pos);
+
+					if (test_uvs2.x > 0.04 && test_uvs2.y > 0.04 && test_uvs2.x < 0.96 && test_uvs2.y < 0.96) {
+					}
+					else {
+						//act_act_min_depth = 0.0;
+					}
+
+					act_act_min_depth -= step_size * step_size_offset_factor;
+					pos_reprojected_depth = act_act_min_depth;
+
+
+					bruhtu = vec3(od);
+					total_repro_steps_percent_taken = float(i) / float(total_steps);
+					break;
+				}
+
+				/*
+				if (od == 10000.0) {
+					pos_reprojected_depth = 10000000;
+					total_repro_steps_percent_taken = float(i) / float(total_steps);
+					break;
+				}
+				*/
+			}
+
+			repr_pos += ray_dir * step_size;
+		}
+	}
+	
+
+	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(bruhtu, 1.0));
+	//return;
+	
 	// reproject the uvs using the last frame's view matrix
+	/*
 	vec4 last_uvs_full = last_frame_view_matrix * vec4(ray_dir_non_normalized.xyz, 0.0);
 	last_uvs_full.w = 0.0;
 	last_uvs_full = (proj_matrix * last_uvs_full);
 	last_uvs_full.xy /= last_uvs_full.w;
+	*/
+
+	vec4 last_uvs_full = (proj_matrix * last_frame_view_matrix) * vec4(ray_dir_non_normalized.xyz, 0.0);
+	last_uvs_full.xyz /= last_uvs_full.w;
 
 	// convert the [-1,1] range to [0,1] for texture sampling
 	vec2 last_uvs = last_uvs_full.xy;
@@ -89,24 +174,29 @@ void main() {
 	float factor = 1.0;
 	
 	float min_depth = 100000;
-	min_depth = texture(last_temporal_depth, last_uvs / scale_factor).x;
-	/*
-	if (last_uvs.x > 0 && last_uvs.y > 0 && last_uvs.x < 1 && last_uvs.y < 1 && last_uvs_full.w > 0) {
-		int scaler = 2;
-		for (int x = -scaler; x <= scaler; x++)
-		{
-			for (int y = -scaler; y <= scaler; y++)
-			{
-				float last_depth = texture(last_temporal_depth, (last_uvs + vec2(x,y) * 0.003 + 0.003) / scale_factor).x;
-				min_depth = min(last_depth, min_depth);
-			}
-		}
+	//min_depth = texture(last_temporal_depth, last_uvs / scale_factor).x;
 
-		if (use_temporal_depth == 1) {
+	if (use_temporal_depth == 1) {
+		if (use_positional_repro == 1) {
+			min_depth = max(pos_reprojected_depth, 0);
 			pos += ray_dir * (min_depth - 0.01);
 		}
+		else {
+			if (last_uvs.x > 0 && last_uvs.y > 0 && last_uvs.x < 1 && last_uvs.y < 1 && last_uvs_full.w > 0) {
+				int scaler = 2;
+				for (int x = -scaler; x <= scaler; x++)
+				{
+					for (int y = -scaler; y <= scaler; y++)
+					{
+						float last_depth = texture(last_temporal_depth, (last_uvs + vec2(x, y) * 0.003) / scale_factor).x;
+						min_depth = min(last_depth, min_depth);
+					}
+				}
+
+				pos += ray_dir * (min_depth - 0.01);
+			}
+		}
 	}
-	*/
 
 	vec3 first_touched_pos = vec3(0);
 	for (int i = 0; i < max_iters; i++) {
@@ -232,7 +322,13 @@ void main() {
 		color = vec3(log(depth) / 5, 0, 0);
 	}
 	else if (debug_view == 11) {
+		color = vec3(log(bruhtu.x) / 5, 0, 0);
+	}
+	else if (debug_view == 12) {
 		color = vec3(log(min_depth) / 5, 0, 0);
+	}
+	else if (debug_view == 13) {
+		color = vec3(total_repro_steps_percent_taken);
 	}
 
 	if (!hit && reflections_iters == 0) {
