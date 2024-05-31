@@ -51,7 +51,7 @@ float hash13(vec3 p3)
 
 void main() {
 	uint64_t bitwise_data = uint64_t(0);
-	//int block_out = int(density(vec3(gl_GlobalInvocationID)));
+	int block_out = int(density(vec3(gl_GlobalInvocationID)));
 	for (int x = 0; x < 4; x++)
 	{
 		for (int y = 0; y < 4; y++)
@@ -63,14 +63,15 @@ void main() {
 
 				bitwise_data |= uint64_t(block) << uint64_t(x * 16 + y * 4 + z);
 				
-				/*
-				bitwise_data |= uint64_t(block_out) << uint64_t(x * 16 + y * 4 + z);
-				if (hash13(pos) > 0.5) {
-				}
-				*/
 			}
 		}
-	}	
+	}
+
+	/*
+	if (block_out == 1) {
+		bitwise_data = packUint2x32(uvec2(0xff00ff, 0x00ff00ff));
+	}
+	*/
 
 	uvec2 data = unpackUint2x32(bitwise_data);
 	imageStore(voxels, ivec3(gl_GlobalInvocationID), uvec4(data, 0, 0));
