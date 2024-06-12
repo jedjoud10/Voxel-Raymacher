@@ -81,6 +81,7 @@ vec3 get_internal_box_normal(int side, vec3 ray_dir) {
 
 // recrusviely go through the mip chain
 void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout uint level_cache) {
+	//return;
 	// recursively iterate through the mip maps (starting at the highest level)
 	// TODO: don't start iterating at the highest level if we know what direction the ray is going and what the current child history is
 	// basically, we can avoid fetching the low-res textures if we are being smart
@@ -118,12 +119,14 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 
 		// pos means full
 		// neg means empty
+		/*
 		int sparse_code = imageLoad(sparse_helper, tex_point / page_size).x;
 		if (sparse_code == 4096) {
 			voxel_distance = inside_node_closest_dist;
 			hit = false;
 			return;
 		}
+		*/
 
 		uvec2 data = texelFetch(voxels, tex_point, j).xy;
 		if (j > 0 && use_prop_aabb_bounds == 1) {

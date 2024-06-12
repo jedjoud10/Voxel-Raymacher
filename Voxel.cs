@@ -13,11 +13,11 @@ namespace Test123Bruh {
     internal class Voxel {
         public int texture;
         public int sparseHelper;
-        public const bool SparseTextures = true;
+        public const bool SparseTextures = false;
         public const bool ListSparsePages = false;
 
         // fixme: SOMETIMES JUST DOESNT FUCKING WORK WHYYYg
-        public const int MapSize = 256;
+        public const int MapSize = 64;
         public const SizedInternalFormat Format = SizedInternalFormat.Rgba32ui;
         public int levels;
         public ulong memoryUsage = 0;
@@ -121,7 +121,7 @@ namespace Test123Bruh {
             memoryUsageSparseReclaimedPerLevel = new ulong[levels];
 
             GL.TextureStorage3D(texture, levels, Format, MapSize, MapSize, MapSize);
-            GL.Ext.TexturePageCommitment(texture, 0, 0, 0, 0, MapSize, MapSize, MapSize, true);
+            //GL.Ext.TexturePageCommitment(texture, 0, 0, 0, 0, MapSize, MapSize, MapSize, true);
             GL.GetInternalformat(ImageTarget.Texture3D, Format, InternalFormatParameter.ImageTexelSize, 1, out int pixelSize);
             Console.WriteLine($"Pixel Size (bytes): " + pixelSize);
 
@@ -212,9 +212,11 @@ namespace Test123Bruh {
                 }
             }
 
-            foreach (var item in toUncommit) {
-                (var page, var i) = item;
-                GL.Ext.TexturePageCommitment(texture, i, page.X * pageSize, page.Y * pageSize, page.Z * pageSize, pageSize, pageSize, pageSize, false);
+            if (SparseTextures) {
+                foreach (var item in toUncommit) {
+                    (var page, var i) = item;
+                    GL.Ext.TexturePageCommitment(texture, i, page.X * pageSize, page.Y * pageSize, page.Z * pageSize, pageSize, pageSize, pageSize, false);
+                }
             }
 
         }

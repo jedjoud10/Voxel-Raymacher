@@ -1,10 +1,6 @@
 ﻿
 #version 460
 #extension GL_ARB_gpu_shader_int64 : enable
-#extension GL_KHR_shader_subgroup_quad : enable
-#extension GL_KHR_shader_subgroup_basic : enable
-#extension GL_KHR_shader_subgroup_vote : enable
-#extension GL_KHR_shader_subgroup_arithmetic : enable
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
 layout(location = 1) uniform vec2 resolution;
 layout(location = 2) uniform mat4 view_matrix;
@@ -26,7 +22,7 @@ layout(rgba8, binding = 0) uniform image2D image;
 layout(binding = 2) uniform usampler3D voxels;
 layout(binding = 3) uniform samplerCube skybox;
 layout(location = 16) uniform mat4 last_frame_view_matrix;
-layout(location = 17) uniform uint frame_count;
+layout(location = 17) uniform int frame_count;
 layout(location = 18) uniform int use_temporal_depth;
 layout(location = 19) uniform vec3 last_position;
 layout(location = 20) uniform float ambient_strength;
@@ -49,6 +45,7 @@ layout(location = 28) uniform int use_positional_repro;
 #include Noise.glsl
 
 void main() {
+	//return;
 	// remap coords to ndc range (-1, 1)
 	vec2 coords = gl_GlobalInvocationID.xy / resolution;
 	coords *= 2.0;
@@ -136,7 +133,6 @@ void main() {
 		}
 	}
 	
-
 	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(bruhtu, 1.0));
 	//return;
 	
@@ -338,7 +334,7 @@ void main() {
 	if (!hit && reflections_iters == 0) {
 		depth = 10000;
 	}
-
+	//return;
 	// store the value in the image that we will blit
 	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 

@@ -25,7 +25,7 @@ namespace Test123Bruh {
         int depthTex1;
 
         int maxLevelIter = 0;
-        int maxIter = 64;
+        int maxIter = 0;
         int maxReflections = 1;
         int maxSubVoxelIter = 6;
         float reflectionRoughness = 0.02f;
@@ -288,7 +288,10 @@ namespace Test123Bruh {
                 writeDepth = depthTex0;
             }
 
+            //Console.WriteLine(GL.GetUniformLocation(compute.program, "use_temporal_depth"));
+
             // Bind compute shader and execute it
+            
             GL.UseProgram(compute.program);
             int scaleDown = 1 << scaleDownFactor;
             movement.UpdateMatrices((float)(ClientSize.Y / scaleDown) / (float)(ClientSize.X / scaleDown), useTemporalReproOpt);
@@ -308,7 +311,7 @@ namespace Test123Bruh {
             GL.Uniform1(14, usePropagatedBoundsOpt ? 1 : 0);
             GL.Uniform1(15, maxSubVoxelIter);
             GL.UniformMatrix4(16, true, ref lastFrameViewMatrix);
-            GL.Uniform1(17, (uint)frameCount);
+            //GL.Uniform1(17, 0);
             GL.Uniform1(18, useTemporalReproOpt ? 1 : 0);
             GL.Uniform3(19, lastPosition);
             GL.Uniform1(20, ambientStrength);
