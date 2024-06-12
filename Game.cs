@@ -17,15 +17,17 @@ namespace Test123Bruh {
         int screenTexture;
         int scaleDownFactor = 1;
         Compute compute = null;
+        Compute depthStuff = null;
         ImGuiController controller = null;
         Voxel voxel = null;
         Movement movement = null;
         Skybox skybox = null;
         int depthTex0;
         int depthTex1;
+        int depthTex2;
 
         int maxLevelIter = 0;
-        int maxIter = 0;
+        int maxIter = 64;
         int maxReflections = 1;
         int maxSubVoxelIter = 6;
         float reflectionRoughness = 0.02f;
@@ -69,10 +71,10 @@ namespace Test123Bruh {
         public Game(GameWindowSettings gameWindowSettings, NativeWindowSettings nativeWindowSettings) : base(gameWindowSettings, nativeWindowSettings) {
         }
 
-        private int CreateScreenTex(SizedInternalFormat format) {
+        private int CreateScreenTex(SizedInternalFormat format, int downscale = 1) {
             int tex = GL.GenTexture();
             GL.BindTexture(TextureTarget.Texture2D, tex);
-            GL.TextureStorage2D(tex, 1, format, ClientSize.X, ClientSize.Y);
+            GL.TextureStorage2D(tex, 1, format, ClientSize.X / downscale, ClientSize.Y / downscale);
             return tex;
         }
 
@@ -88,12 +90,14 @@ namespace Test123Bruh {
             screenTexture = CreateScreenTex(SizedInternalFormat.Rgba8);
             depthTex0 = CreateScreenTex(SizedInternalFormat.R32f);
             depthTex1 = CreateScreenTex(SizedInternalFormat.R32f);
+            depthTex2 = CreateScreenTex(SizedInternalFormat.R32f, 2);
 
             fbo = GL.GenFramebuffer();
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
             GL.NamedFramebufferTexture(fbo, FramebufferAttachment.ColorAttachment0, screenTexture, 0);
 
             compute = new Compute("Basic.glsl");
+            depthStuff = new Compute("DepthDownscaler.glsl");
             voxel = new Voxel();
             controller = new ImGuiController(ClientSize.X, ClientSize.Y);
             movement = new Movement();
@@ -109,6 +113,7 @@ namespace Test123Bruh {
             screenTexture = CreateScreenTex(SizedInternalFormat.Rgba8);
             depthTex0 = CreateScreenTex(SizedInternalFormat.R32f);
             depthTex1 = CreateScreenTex(SizedInternalFormat.R32f);
+            depthTex2 = CreateScreenTex(SizedInternalFormat.R32f, 2);
 
             GL.NamedFramebufferTexture(fbo, FramebufferAttachment.ColorAttachment0, screenTexture, 0);
             GL.Viewport(0, 0, e.Width, e.Height);
@@ -288,12 +293,19 @@ namespace Test123Bruh {
                 writeDepth = depthTex0;
             }
 
-            //Console.WriteLine(GL.GetUniformLocation(compute.program, "use_temporal_depth"));
+            int scaleDown = 1 << scaleDownFactor;
+            int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
+            int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
+
+
+            // Run the depth downscaler / pyramid thingy
+            GL.UseProgram(depthStuff.program);
+            GL.BindImageTexture(0, readDepth, 0, false, 0, TextureAccess.ReadOnly, SizedInternalFormat.R32f);
+            GL.BindImageTexture(1, depthTex2, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32f);
+            GL.DispatchCompute(x / 2 + 1, y / 2 + 1, 1);
 
             // Bind compute shader and execute it
-            
             GL.UseProgram(compute.program);
-            int scaleDown = 1 << scaleDownFactor;
             movement.UpdateMatrices((float)(ClientSize.Y / scaleDown) / (float)(ClientSize.X / scaleDown), useTemporalReproOpt);
             GL.Uniform2(1, ClientSize.ToVector2() / scaleDown);
             GL.UniformMatrix4(2, true, ref movement.viewMatrix);
@@ -328,11 +340,9 @@ namespace Test123Bruh {
             GL.BindImageTexture(1, writeDepth, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32f);
             GL.BindTextureUnit(2, voxel.texture);
             GL.BindTextureUnit(3, skybox.texture);
-            GL.BindTextureUnit(4, voxel.sparseHelper);
-            GL.BindTextureUnit(5, readDepth);
-            int x = (int)MathF.Ceiling((float)(ClientSize.X / scaleDown) / 32.0f);
-            int y = (int)MathF.Ceiling((float)(ClientSize.Y / scaleDown) / 32.0f);
-
+            //GL.BindTextureUnit(4, voxel.sparseHelper);
+            GL.BindTextureUnit(5, depthTex2);
+            
 
             GL.DispatchCompute(x, y, 1);
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);

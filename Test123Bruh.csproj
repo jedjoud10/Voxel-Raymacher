@@ -23,13 +23,21 @@
 
   <ItemGroup>
     <None Remove="Resources\BasicCopy.glsl" />
+    <None Remove="Resources\DepthDownscaler.glsl" />
     <None Remove="Resources\Hashes.glsl" />
     <None Remove="Resources\Intersections.glsl" />
     <None Remove="Resources\Lighting.glsl" />
     <None Remove="Resources\Noise.glsl" />
     <None Remove="Resources\Skybox.glsl" />
+    <None Remove="Resources\SkyboxTest.glsl" />
     <None Remove="Resources\Voxel.glsl" />
     <None Remove="Resources\VoxelPropagate.glsl" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="Resources\SkyboxTest.glsl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

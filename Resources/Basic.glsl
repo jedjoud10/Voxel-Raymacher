@@ -87,41 +87,21 @@ void main() {
 			test_uvs2 /= 2;
 
 			if (test_uvs2.x > 0 && test_uvs2.y > 0 && test_uvs2.x < 1 && test_uvs2.y < 1 && test_uvs.w > 0) {
-				//float od = texture(last_temporal_depth, test_uvs2 / scale_factor).x;
-
-				float od = 10000.0;
-				int scaler = 1;
-				for (int x = -scaler; x <= scaler; x++)
-				{
-					for (int y = -scaler; y <= scaler; y++)
-					{
-						float last_depth = texture(last_temporal_depth, (test_uvs2 + vec2(x, y) * 0.003) / scale_factor).x;
-						od = min(last_depth, od);
-					}
-				}
-
-
+				float od = texture(last_temporal_depth, test_uvs2 / scale_factor).x;
 				float nd = distance(last_position, repr_pos);
+				//float od = 10000.0;
 				if (od < nd) {
 					float act_act_min_depth = distance(position, repr_pos);
-
-					if (test_uvs2.x > 0.04 && test_uvs2.y > 0.04 && test_uvs2.x < 0.96 && test_uvs2.y < 0.96) {
-					}
-					else {
-						//act_act_min_depth = 0.0;
-					}
-
 					act_act_min_depth -= step_size * step_size_offset_factor;
 					pos_reprojected_depth = act_act_min_depth;
-
-
 					bruhtu = vec3(od);
 					total_repro_steps_percent_taken = float(i) / float(total_steps);
 					break;
 				}
 
+				
 				/*
-				if (od == 10000.0) {
+				if (od == 10000.0 && i == 0) {
 					pos_reprojected_depth = 10000000;
 					total_repro_steps_percent_taken = float(i) / float(total_steps);
 					break;

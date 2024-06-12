@@ -13,6 +13,8 @@ namespace Test123Bruh {
     internal class Voxel {
         public int texture;
         public int sparseHelper;
+
+        // sparse tetures kinda brokey on me 780
         public const bool SparseTextures = false;
         public const bool ListSparsePages = false;
 
@@ -33,6 +35,7 @@ namespace Test123Bruh {
          * Speed optimizations:
          * Optimize iteration using subgroup shenanigans?
          * Temporal depth reprojection from last frame (use it as "starting point" for iter) (DONE, but buggy. Also only works with rotational repr rn)
+            * Made it work with positional data as well, just gotta optimize depth fetching by making lower res map of it 
          * AABB tree for node sizes 1 and larger (DONE)
          * AABB Bounds for sub-voxels, pre-calculated for EVERY possible sub-voxel combination. At runtime would just fetch the bounds from a texture maybe?
             * Bounds are symmetric in someways so we don't need to store *all* information really. Could be really optimized
@@ -121,7 +124,10 @@ namespace Test123Bruh {
             memoryUsageSparseReclaimedPerLevel = new ulong[levels];
 
             GL.TextureStorage3D(texture, levels, Format, MapSize, MapSize, MapSize);
-            //GL.Ext.TexturePageCommitment(texture, 0, 0, 0, 0, MapSize, MapSize, MapSize, true);
+            
+            if (SparseTextures)
+                GL.Ext.TexturePageCommitment(texture, 0, 0, 0, 0, MapSize, MapSize, MapSize, true);
+            
             GL.GetInternalformat(ImageTarget.Texture3D, Format, InternalFormatParameter.ImageTexelSize, 1, out int pixelSize);
             Console.WriteLine($"Pixel Size (bytes): " + pixelSize);
 
@@ -136,7 +142,7 @@ namespace Test123Bruh {
             propagate = new Compute("VoxelPropagate.glsl");
             
             GL.UseProgram(generation.program);
-            GL.BindImageTexture(0, texture, 0, false, 0, TextureAccess.WriteOnly, Format);
+            GL.BindImageTexture(0, texture, 0, true, 0, TextureAccess.WriteOnly, Format);
             GL.DispatchCompute(MapSize / 4, MapSize / 4, MapSize / 4);
 
             sparseHelper = -1;
@@ -160,11 +166,11 @@ namespace Test123Bruh {
                     GL.Ext.TexturePageCommitment(texture, i + 1, 0, 0, 0, testSize, testSize, testSize, true);
 
                     // needed for readback after the compute to get rid of unused pages
-                    GL.BindImageTexture(2, sparseHelper, i, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32i);
+                    GL.BindImageTexture(2, sparseHelper, i, true, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32i);
                 }
 
-                GL.BindImageTexture(0, texture, i, false, 0, TextureAccess.ReadOnly, Format);
-                GL.BindImageTexture(1, texture, i+1, false, 0, TextureAccess.WriteOnly, Format);
+                GL.BindImageTexture(0, texture, i, true, 0, TextureAccess.ReadOnly, Format);
+                GL.BindImageTexture(1, texture, i+1, true, 0, TextureAccess.WriteOnly, Format);
 
                 GL.Uniform1(3, (i != 0) ? 1 : 0);
 
@@ -215,10 +221,9 @@ namespace Test123Bruh {
             if (SparseTextures) {
                 foreach (var item in toUncommit) {
                     (var page, var i) = item;
-                    GL.Ext.TexturePageCommitment(texture, i, page.X * pageSize, page.Y * pageSize, page.Z * pageSize, pageSize, pageSize, pageSize, false);
+                    //GL.Ext.TexturePageCommitment(texture, i, page.X * pageSize, page.Y * pageSize, page.Z * pageSize, pageSize, pageSize, pageSize, false);
                 }
             }
-
         }
     }
 }

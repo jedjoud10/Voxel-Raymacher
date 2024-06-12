@@ -113,20 +113,17 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 		// instead of using the bounds directly, use the propagated aabb for tighter culling
 		ivec3 tex_point = ivec3(floor(pos / scale_factor));
 
-
 		// I LOVE SPARSE TEXTURES!!!!
 		int page_size = 16;
 
 		// pos means full
 		// neg means empty
-		/*
 		int sparse_code = imageLoad(sparse_helper, tex_point / page_size).x;
 		if (sparse_code == 4096) {
 			voxel_distance = inside_node_closest_dist;
 			hit = false;
 			return;
 		}
-		*/
 
 		uvec2 data = texelFetch(voxels, tex_point, j).xy;
 		if (j > 0 && use_prop_aabb_bounds == 1) {
