@@ -132,6 +132,7 @@ out vec4 outputColor;
 void main()
 {
     outputColor = color * texture(in_fontTexture, texCoord);
+    outputColor.xyz = pow(outputColor.xyz, vec3(2.2));
     //outputColor = vec4(texCoord, 0, 1);
 }";
 

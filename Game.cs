@@ -82,8 +82,8 @@ namespace Test123Bruh {
             base.OnLoad();
             CursorState = CursorState.Grabbed;
 
-            GL.DebugMessageCallback(OnDebugMessage, 0);
-            GL.Enable(EnableCap.DebugOutput);
+            //GL.DebugMessageCallback(OnDebugMessage, 0);
+            //GL.Enable(EnableCap.DebugOutput);
             GL.Enable(EnableCap.TextureCubeMapSeamless);
             GL.Enable(EnableCap.DebugOutputSynchronous);
 
@@ -92,6 +92,8 @@ namespace Test123Bruh {
             depthTex1 = CreateScreenTex(SizedInternalFormat.R32f);
             depthTex2 = CreateScreenTex(SizedInternalFormat.R32f, 2);
 
+            GL.Enable(EnableCap.FramebufferSrgb);
+            //GL.Enable(EnableCap.Dither);
             fbo = GL.GenFramebuffer();
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
             GL.NamedFramebufferTexture(fbo, FramebufferAttachment.ColorAttachment0, screenTexture, 0);
@@ -171,9 +173,13 @@ namespace Test123Bruh {
             ImGui.Text("F3: Take screenshot and save it as Jpeg");
             ImGui.ListBox("Debug View Type", ref debugView, new string[] {
                 "Non-Debug", "Map intersection normal", "Total iterations",
-                "Max mip level fetched", "Total bit fetches", "Total reflections", "Normals", "Global Position",
+                "Max mip level fetched", "Total bit fetches", "Total mip-map iterations", "Total reflections", "Normals", "Global Position",
                 "Local Position", "Sub-voxel Local Position", "Scene Depth (log)", "Reprojected Scene Depth (log)", "Min Depth Taken For Repro", "Total Reprojection Steps Taken (percent)" }, 14);
             ImGui.PlotLines("Time Graph", ref frameGraphData[0], 512);
+
+            System.Numerics.Vector3 p = ToVec3(movement.position);
+            ImGui.InputFloat3("Position", ref p);
+            FromVec3(p, ref movement.position);
 
             if (ImGui.CollapsingHeader("Parameters, Limits & Optimizations")) {
                 ImGui.SliderFloat("Horizontal Fov", ref movement.hFov, 0.1f, 179f);
@@ -188,8 +194,18 @@ namespace Test123Bruh {
                 ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
 
 
-                ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
                 ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
+
+                /*
+                if (!usePropagatedBoundsOpt)
+                    ImGui.BeginDisabled();
+                */
+                ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
+                /*
+                if (!usePropagatedBoundsOpt)
+                    ImGui.EndDisabled();
+                */
+
                 ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
 
                 if (!useTemporalReproOpt)
@@ -248,7 +264,11 @@ namespace Test123Bruh {
             float delta = (float)args.Time;
             frameGraphData[frameCount % 512] = delta;
 
-            skybox.Update(timeElapsed, lightDirection, (int)(frameCount % 6));
+            lightDirection = new Vector3(MathF.Sin(timeElapsed), 0.8f, MathF.Cos(timeElapsed)).Normalized();
+
+
+            skybox.Update(timeElapsed, lightDirection);
+
             controller.Update(this, delta);
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             GL.ClearColor(new Color4(0, 32, 48, 255));
@@ -326,10 +346,10 @@ namespace Test123Bruh {
             //GL.Uniform1(17, 0);
             GL.Uniform1(18, useTemporalReproOpt ? 1 : 0);
             GL.Uniform3(19, lastPosition);
-            GL.Uniform1(20, ambientStrength);
+            //GL.Uniform1(20, ambientStrength);
             GL.Uniform1(21, normalMapStrength);
-            GL.Uniform1(22, glossStrength);
-            GL.Uniform1(23, specularStrength);
+            //GL.Uniform1(22, glossStrength);
+            //GL.Uniform1(23, specularStrength);
             GL.Uniform3(24, topColor);
             GL.Uniform3(25, sideColor);
             GL.Uniform1(26, holdTemporalValues ? 1 : 0);

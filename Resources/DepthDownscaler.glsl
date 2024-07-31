@@ -6,11 +6,12 @@ layout(r32f, binding = 1) uniform image2D downscaled_depth;
 void main() {
 	float od = 10000.0;
 	int scaler = 1;
+	int factor = 3;
 	for (int x = -scaler; x <= scaler; x++)
 	{
 		for (int y = -scaler; y <= scaler; y++)
 		{
-			float last_depth = imageLoad(native_res_depth, ivec2(gl_GlobalInvocationID.xy * 2) + ivec2(x, y) * 10).x;
+			float last_depth = imageLoad(native_res_depth, ivec2(gl_GlobalInvocationID.xy * 2) + ivec2(x, y) * factor).x;
 			od = min(last_depth, od);
 		}
 	}

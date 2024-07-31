@@ -11,7 +11,13 @@ float sdBox(vec3 p, vec3 b)
 	return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0);
 }
 
-bool density(vec3 pos) {
+struct Voxel {
+	bool enabled;
+	int type;
+};
+
+Voxel voxel(vec3 pos) {
+	Voxel data = Voxel(false, 0);
 	float val = pos.y - 30;
 	
 	/*
@@ -19,10 +25,14 @@ bool density(vec3 pos) {
 		val += sin(pos.z * 0.2)*3;
 	}
 	*/
-	val += snoise(pos * 0.02 * vec3(1, 0.3, 1)) * 10;
-	val += (1-cellular(pos.xz * 0.03).y) * 20;
-	val += snoise(pos * 0.04 * vec3(1, 4, 1)) * 15 * clamp(snoise(pos * 0.01) * 10, 0, 1);
-	val = min(val-10, pos.y - 32);
+	val += snoise(pos * 0.02 * vec3(1, 0.3, 1)) * 5;
+	val += (1-cellular(pos.xz * 0.03).y) * 10 - 20;
+
+	if (cellular(pos.xz * 0.1).x > 0.8 && pos.y < 90) {
+		val -= 10 + snoise(pos * 0.02) * 15;
+	}
+	//val += snoise(pos * 0.04 * vec3(1, 4, 1)) * 15 * clamp(snoise(pos * 0.01) * 10, 0, 1);
+	//val = min(val-6, pos.y - 32);
 	//val += snoise(pos * 0.3) * 0.2;
 	//val += snoise(pos * 0.01) * 0.1;
 	//val += clamp(snoise(pos * 0.01) * 30 - 10, 0, 15) * 3;
@@ -33,12 +43,10 @@ bool density(vec3 pos) {
 	//val += abs(snoise(pos * 0.04 * vec3(1, 3, 1))) * 10;
 	//val = min(val, pos.y - 60);
 	
-	/*
-	float boxu = sdBox(pos - vec3(32, 30, 64), vec3(10, 6, 2));
+	float boxu = sdBox(pos - vec3(32, 30, 64), vec3(100, 60, 2));
 	val = min(val, boxu);
-	*/
-
-	return val <= 0;
+	data.enabled = val <= 0;
+	return data;
 }
 
 float hash13(vec3 p3)
@@ -51,7 +59,6 @@ float hash13(vec3 p3)
 
 void main() {
 	uint64_t bitwise_data = uint64_t(0);
-	int block_out = int(density(vec3(gl_GlobalInvocationID)));
 	for (int x = 0; x < 4; x++)
 	{
 		for (int y = 0; y < 4; y++)
@@ -59,7 +66,7 @@ void main() {
 			for (int z = 0; z < 4; z++)
 			{
 				vec3 pos = vec3(gl_GlobalInvocationID) + vec3(x, y, z) / 4.0;
-				int block = int(density(pos));
+				int block = int(voxel(pos).enabled);
 
 				bitwise_data |= uint64_t(block) << uint64_t(x * 16 + y * 4 + z);
 				

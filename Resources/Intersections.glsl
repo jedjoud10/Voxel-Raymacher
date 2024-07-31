@@ -12,22 +12,9 @@ for (int d = 0; d < 3; d++) {
 	tmax = min(dmax, tmax);
 }
 */
+
 // 3d cube vs ray intersection that allows us to calculate closest distance to face of cube
 // https://tavianator.com/2022/ray_box_boundary.html :3
-vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig) {
-	float tmin = 0.0, tmax = 1000000.0;
-	for (int d = 0; d < 3; d++) {
-		float t1 = (smol[d] - pos[d]) * inv_dir[d];
-		float t2 = (beig[d] - pos[d]) * inv_dir[d];
-
-		tmin = max(tmin, min(t1, t2));
-		tmax = min(tmax, max(t1, t2));
-	}
-
-	return vec2(tmin, tmax);
-}
-
-// same one but with directions
 vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig, inout int max_dir, inout int min_dir) {
 	float tmin = 0.0, tmax = 1000000.0;
 	for (int d = 0; d < 3; d++) {
@@ -48,6 +35,13 @@ vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig, inout 
 	}
 
 	return vec2(tmin, tmax);
+}
+
+// same one without direction
+vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig) {
+	int max_dir = 0;
+	int min_dir = 0;
+	return intersection(pos, dir, inv_dir, smol, beig, max_dir, min_dir);
 }
 
 // fetches the 64 bit 4x4x4 sub-voxel volume for one voxel
@@ -80,7 +74,7 @@ vec3 get_internal_box_normal(int side, vec3 ray_dir) {
 }
 
 // recrusviely go through the mip chain
-void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout uint level_cache) {
+void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout float total_mip_map_iterations, inout uint level_cache) {
 	//return;
 	// recursively iterate through the mip maps (starting at the highest level)
 	// TODO: don't start iterating at the highest level if we know what direction the ray is going and what the current child history is
@@ -100,6 +94,8 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 	}
 
 	for (int j = inv_start_level; j >= 0; j--) {
+		total_mip_map_iterations += 1;
+
 		// use the mip maps themselves as an acceleration structure
 		float scale_factor = pow(2, j);
 		vec3 grid_level_point = floor(pos / scale_factor) * scale_factor;
@@ -118,14 +114,17 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 
 		// pos means full
 		// neg means empty
+		/*
 		int sparse_code = imageLoad(sparse_helper, tex_point / page_size).x;
 		if (sparse_code == 4096) {
 			voxel_distance = inside_node_closest_dist;
 			hit = false;
 			return;
 		}
-
+		*/
+		bool quit = false;
 		uvec2 data = texelFetch(voxels, tex_point, j).xy;
+		float closest_tahini = inside_node_closest_dist;
 		if (j > 0 && use_prop_aabb_bounds == 1) {
 			uint mint = data.x;
 			uint mauint = data.y;
@@ -135,25 +134,29 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 
 			// check if we hit the aabb
 			float bounds_closest_dist = bounds_distances.x;
+			closest_tahini = bounds_closest_dist;
 			if (bounds_distances.y > bounds_distances.x) {
 				// check if we're outside the aabb 
 				if (bounds_distances.x > 0) {
 					voxel_distance = bounds_closest_dist;
-					hit = false;
-					return;
+					quit = true;
 				}
 			}
 			else {
 				// if we didn't hit the aabb then we don't need to iterate all the lower levels, skip the whole node lel
 				voxel_distance = inside_node_closest_dist;
-				hit = false;
-				return;
+				quit = true;
 			}
 		}
 
 		// skip over big areas!!!
 		// FIXME: For some reason on my iGPU all(data == uvec2(0)) doesn't compile :3
 		if (data.x == 0 && data.y == 0) {
+			quit = true;
+			voxel_distance = inside_node_closest_dist;
+		}
+
+		if (quit) {
 			// calculate child offset relative to parent
 			vec3 center = grid_level_point + vec3(scale_factor) * 0.5;
 
@@ -161,7 +164,7 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 			vec3 parent_center = floor(pos / (scale_factor * 2)) * scale_factor * 2 + vec3(scale_factor);
 
 			// get local offset dir
-			vec3 local_offset_dir = parent_center - center;
+			vec3 local_offset_dir = normalize(parent_center - center);
 
 			// if dot product between ray_dir and child offset local to parent is negative it means that the next time we iterate we can start at the current level instead of the highest level
 			uint bwuh = uint(1) << uint(j);
@@ -172,10 +175,12 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 				level_cache &= ~bwuh;
 			}
 
-			voxel_distance = inside_node_closest_dist;
+			//level_cache = 0;
+			//voxel_distance = inside_node_closest_dist;
+			
 			hit = false;
 			min_level_reached = min(min_level_reached, j);
-
+			//voxel_distance = closest_tahini;
 			return;
 		}
 	}

@@ -27,8 +27,6 @@ layout(location = 18) uniform int use_temporal_depth;
 layout(location = 19) uniform vec3 last_position;
 layout(location = 20) uniform float ambient_strength;
 layout(location = 21) uniform float normal_map_strength;
-layout(location = 22) uniform float gloss_strength;
-layout(location = 23) uniform float specular_strength;
 layout(location = 24) uniform vec3 top_color;
 layout(location = 25) uniform vec3 side_color;
 layout(r32i, binding = 4) uniform iimage3D sparse_helper;
@@ -139,7 +137,7 @@ void main() {
 	// vars for default view
 	vec3 color = vec3(0.0);
 	vec3 normal = vec3(0);
-	uint level_cache = 8;
+	uint level_cache = uint(1) << (max_mip_iter);
 
 	// debug stuffs
 	float total_iterations = 0.0;
@@ -186,7 +184,7 @@ void main() {
 		}
 
 		// recursively go through the mip chain
-		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, level_cache);
+		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, total_mip_map_iterations, level_cache);
 
 		// gotta add a small offset since we'd be on the very face of the voxel
 		pos += ray_dir * max(0.001, voxel_distance);
@@ -221,10 +219,10 @@ void main() {
 						//ray_dir += (hash33(floor(pos*4) / 4) - 0.5) * reflection_roughness;
 						//ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
 						//ray_dir += vec3(snoise(pos * 0.4 + vec3(pos * 0.2) * 0.8) * reflection_roughness);
-						ray_dir += vec3(fbm(pos * 0.4, 3, 0.5, 1.3) * reflection_roughness);
+						//ray_dir += vec3(fbm(pos * 0.4, 3, 0.5, 1.3) * reflection_roughness);
 						ray_dir = normalize(ray_dir);
 						inv_dir = 1.0 / (ray_dir + vec3(0.0001));
-						level_cache = 0;
+						level_cache = uint(~0);
 						factor /= 2.0;
 
 						pos += ray_dir * 0.01;
@@ -232,8 +230,7 @@ void main() {
 						continue;
 					}
 					else {
-						color = sky(ray_dir);
-						hit = true;
+						hit = false;
 						break;
 					}
 				}
@@ -242,7 +239,39 @@ void main() {
 				float lod = 1.0 / distance(pos, position);
 				lod = clamp(lod, 0, 1);
 				lod = 0;
-				color = lighting(pos, normal, ray_dir);
+
+				float shadowed = 0;
+				vec3 shadow_pos = pos + light_dir * 0.1;
+				vec3 shadow_dir = light_dir;
+				vec3 inv_shadow_dir = 1 / (shadow_dir + vec3(0.001));
+				float sum = 0;
+				for (int i = 0; i < 32; i++) {
+					bool temp_hit = true;
+					total_iterations += 1;
+					float voxel_distance = 0.0;
+
+					// we know the map isn't *that* big
+					if (any(greaterThan(shadow_pos, vec3(map_size))) || any(lessThan(shadow_pos, vec3(0)))) {
+						break;
+					}
+
+					// recursively go through the mip chain
+					recurse(shadow_pos, shadow_dir, inv_shadow_dir, temp_hit, voxel_distance, min_level_reached, total_mip_map_iterations, level_cache);
+					
+					// gotta add a small offset since we'd be on the very face of the voxel
+					shadow_pos += shadow_dir * max(0.001, voxel_distance);
+					sum += voxel_distance;
+
+					if (temp_hit) {
+						shadowed = 1;
+						break;
+					}
+				}
+				
+				shadowed = shadowed * (1 - clamp(sum / 100, 0, 1));
+				shadowed = pow(shadowed, 0.2);
+				color = lighting(pos, normal, ray_dir, shadowed);
+				//color = vec3(shadowed);
 
 				// dim the block faces if they are facing inside
 				vec3 ta = (pos - ray_dir * 0.02);
@@ -262,9 +291,10 @@ void main() {
 	// ACTUAL GAME VIEW
 	if (debug_view == 0) {
 		if (!hit) {
-			color = sky(ray_dir);
+			color = texture(skybox, ray_dir).xyz;
 		}
 		color /= pow(2, max(reflections_iters-1, 0));
+		color = aces(color);
 		//color *= pow((1 - factor), 0.5) * 0.4 + 0.6;
 	}
 	else if (debug_view == 1) {
@@ -283,31 +313,34 @@ void main() {
 		color = vec3(total_inner_bit_fetches / float(60));
 	}
 	else if (debug_view == 5) {
-		color = vec3(float(reflections_iters) / float(max_reflections));
+		color = vec3(total_mip_map_iterations / float(128));
 	}
 	else if (debug_view == 6) {
+		color = vec3(float(reflections_iters) / float(max_reflections));
+	}
+	else if (debug_view == 7) {
 		normal = normalize(normal);
 		color = normal;		
 	}
-	else if (debug_view == 7) {
+	else if (debug_view == 8) {
 		color = pos;
 	}
-	else if (debug_view == 8) {
+	else if (debug_view == 9) {
 		color = pos - floor(pos);
 	}
-	else if (debug_view == 9) {
+	else if (debug_view == 10) {
 		color = pos * 4 - floor(pos * 4);
 	}
-	else if (debug_view == 10) {
+	else if (debug_view == 11) {
 		color = vec3(log(depth) / 5, 0, 0);
 	}
-	else if (debug_view == 11) {
+	else if (debug_view == 12) {
 		color = vec3(log(bruhtu.x) / 5, 0, 0);
 	}
-	else if (debug_view == 12) {
+	else if (debug_view == 13) {
 		color = vec3(log(min_depth) / 5, 0, 0);
 	}
-	else if (debug_view == 13) {
+	else if (debug_view == 14) {
 		color = vec3(total_repro_steps_percent_taken);
 	}
 

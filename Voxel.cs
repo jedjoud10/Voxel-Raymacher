@@ -13,14 +13,15 @@ namespace Test123Bruh {
     internal class Voxel {
         public int texture;
         public int sparseHelper;
+        public int materialTexture;
 
         // sparse tetures kinda brokey on me 780
         public const bool SparseTextures = false;
         public const bool ListSparsePages = false;
 
         // fixme: SOMETIMES JUST DOESNT FUCKING WORK WHYYYg
-        public const int MapSize = 64;
-        public const SizedInternalFormat Format = SizedInternalFormat.Rgba32ui;
+        public const int MapSize = 256;
+        public const SizedInternalFormat Format = SizedInternalFormat.Rg32ui;
         public int levels;
         public ulong memoryUsage = 0;
         public ulong memoryUsageSparseReclaimed = 0;
