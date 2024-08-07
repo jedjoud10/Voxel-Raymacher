@@ -20,32 +20,26 @@ Voxel voxel(vec3 pos) {
 	Voxel data = Voxel(false, 0);
 	float val = pos.y - 30;
 	
-	/*
 	if (pos.x < 33.0) {
 		val += sin(pos.z * 0.2)*3;
 	}
-	*/
+	
 	val += snoise(pos * 0.02 * vec3(1, 0.3, 1)) * 5;
 	val += (1-cellular(pos.xz * 0.03).y) * 10 - 20;
 
 	if (cellular(pos.xz * 0.1).x > 0.8 && pos.y < 90) {
-		val -= 10 + snoise(pos * 0.02) * 15;
+		val -= 5 + snoise(pos * 0.02) * 15;
 	}
-	//val += snoise(pos * 0.04 * vec3(1, 4, 1)) * 15 * clamp(snoise(pos * 0.01) * 10, 0, 1);
-	//val = min(val-6, pos.y - 32);
-	//val += snoise(pos * 0.3) * 0.2;
-	//val += snoise(pos * 0.01) * 0.1;
-	//val += clamp(snoise(pos * 0.01) * 30 - 10, 0, 15) * 3;
-	//val += clamp(cellular(pos.xz * 0.01).y * 2, 0, 1) * 2;
-	
-	//val = max(val, pos.y - 50);
-	//val -= (1 - abs(snoise(pos * 0.02 * vec3(1, 2, 1)))) * 20;
-	//val += abs(snoise(pos * 0.04 * vec3(1, 3, 1))) * 10;
-	//val = min(val, pos.y - 60);
+
+	val -= (1 - abs(snoise(pos * 0.02 * vec3(1, 2, 1)))) * 2;
+
+	val += abs(snoise(pos * 0.04 * vec3(1, 3, 1))) * 2;
 	
 	float boxu = sdBox(pos - vec3(32, 30, 64), vec3(100, 60, 2));
 	val = min(val, boxu);
 	data.enabled = val <= 0;
+
+	//data.enabled = -fbmBillow(pos * 0.005, 4, 0.5, 2.0) * 150 + pos.y + 120 <= 0;
 	return data;
 }
 

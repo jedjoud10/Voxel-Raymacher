@@ -140,6 +140,8 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir, float shadowed) {
 	smooth_normal = normalize(smooth_normal);
 	vec3 internal = floor(pos * 4.0) / 4.0;
 	*/
+
+	normal = normalize((-(floor(pos) - (pos) + 0.5) / 0.5));
 	vec3 rand = vec3(hash13(larger) * 0.1 + hash13(medium) * 0.2 + 0.7) * (hash33(small)-0.5)*2;
 	//normal += rand * normal_map_strength;
 	normal = normalize(normal);

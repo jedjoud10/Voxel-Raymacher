@@ -305,3 +305,19 @@ float fbm(vec3 pos, uint octaves, float persistence, float lacunarity) {
 
 	return final;
 }
+
+
+// fBM noise, uses 3D simplex noise
+float fbmBillow(vec3 pos, uint octaves, float persistence, float lacunarity) {
+	float final = 0.0;
+	float scale = 1.0;
+	float amplitude = 1.0;
+
+	for (uint i = 0; i < octaves; i++) {
+		final += -abs(snoise(pos * scale + random3(float(i)))) * amplitude;
+		scale *= lacunarity;
+		amplitude *= persistence;
+	}
+
+	return final;
+}

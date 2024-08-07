@@ -262,21 +262,22 @@ void main() {
 					shadow_pos += shadow_dir * max(0.001, voxel_distance);
 					sum += voxel_distance;
 
+					if (temp_hit && use_sub_voxels == 1) {
+						trace_internal(shadow_pos, shadow_dir, inv_shadow_dir, voxel_distance, temp_hit, total_inner_bit_fetches);
+					}
+
 					if (temp_hit) {
 						shadowed = 1;
 						break;
 					}
 				}
 				
-				shadowed = shadowed * (1 - clamp(sum / 100, 0, 1));
-				shadowed = pow(shadowed, 0.2);
 				color = lighting(pos, normal, ray_dir, shadowed);
-				//color = vec3(shadowed);
-
+				
 				// dim the block faces if they are facing inside
 				vec3 ta = (pos - ray_dir * 0.02);
 				if (all(greaterThan(ta, grid_level_point)) && all(lessThan(ta, grid_level_point + vec3(scale)))) {
-					color *= 0.3;
+					//color *= 0.3;
 				}
 
 				hit = true;
