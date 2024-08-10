@@ -28,13 +28,14 @@ namespace Test123Bruh {
 
         int maxLevelIter = 0;
         int maxIter = 64;
+        int maxShadowIter = 32;
         int maxReflections = 1;
         int maxSubVoxelIter = 6;
         float reflectionRoughness = 0.02f;
         int debugView = 0;
         bool useSubVoxels = false;
         bool useMipchainCacheOpt = false;
-        bool usePropagatedBoundsOpt = false;
+        bool useAABBOpt = false;
         bool useTemporalReproOpt = false;
         bool usePositionalTemporalReproOpt = false;
         ulong frameCount = 0;
@@ -44,12 +45,12 @@ namespace Test123Bruh {
         Vector3 lastPosition = Vector3.Zero;
         bool holdTemporalValues = false;
 
-        float ambientStrength = 0.8f;
-        float normalMapStrength = 0.1f;
-        float glossStrength = 0.2f;
-        float specularStrength = 0.1f;
-        Vector3 topColor = new Vector3(4, 117, 30) / 255.0f;
-        Vector3 sideColor = new Vector3(69, 46, 21) / 255.0f;
+        float ambientStrength = 0.035f;
+        float normalMapStrength = 0.2f;
+        float roughnessStrength = 0.5f;
+        float metallicStrength = 0.5f;
+        Vector3 topColor = new Vector3(44, 87, 54) / 255.0f;
+        Vector3 sideColor = new Vector3(100, 84, 67) / 255.0f;
         float timeElapsed = 0.0f;
         
         private static void OnDebugMessage(
@@ -184,6 +185,7 @@ namespace Test123Bruh {
             if (ImGui.CollapsingHeader("Parameters, Limits & Optimizations")) {
                 ImGui.SliderFloat("Horizontal Fov", ref movement.hFov, 0.1f, 179f);
                 ImGui.SliderInt("Max Iters", ref maxIter, 0, 512);
+                ImGui.SliderInt("Max Shadow Iters", ref maxShadowIter, 0, 64);
                 ImGui.SliderInt("Max Sub-Voxel Iters", ref maxSubVoxelIter, 0, 6);
                 ImGui.SliderInt("Starting Mip-chain Depth", ref maxLevelIter, 0, voxel.levels - 1);
                 ImGui.SliderInt("Max Ray Reflections", ref maxReflections, 0, 10);
@@ -194,17 +196,8 @@ namespace Test123Bruh {
                 ImGui.Checkbox("Use Sub-Voxels (bitmask)?", ref useSubVoxels);
 
 
-                ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref usePropagatedBoundsOpt);
-
-                /*
-                if (!usePropagatedBoundsOpt)
-                    ImGui.BeginDisabled();
-                */
+                ImGui.Checkbox("Use Propagated AABB Bounds Optimization?", ref useAABBOpt);
                 ImGui.Checkbox("Use Mip-chain Ray Cache Octree Optimization?", ref useMipchainCacheOpt);
-                /*
-                if (!usePropagatedBoundsOpt)
-                    ImGui.EndDisabled();
-                */
 
                 ImGui.Checkbox("Use Temporally Reprojected Depth Optimization?", ref useTemporalReproOpt);
 
@@ -248,14 +241,11 @@ namespace Test123Bruh {
 
                 ImGui.SliderFloat("Ambient Strength", ref ambientStrength, 0.0f, 1.0f);
                 ImGui.SliderFloat("Normals Strength", ref normalMapStrength, 0.0f, 1.0f);
-                ImGui.SliderFloat("Gloss Strength", ref glossStrength, 0.0f, 1.0f);
-                ImGui.SliderFloat("Specular Strength", ref specularStrength, 0.0f, 1.0f);
+                ImGui.SliderFloat("Roughness Strength", ref roughnessStrength, 0.0f, 1.0f);
+                ImGui.SliderFloat("Metallic Strength", ref metallicStrength, 0.0f, 1.0f);
             }
 
             ImGui.End();            
-
-            //ImGui.DockSpaceOverViewport();
-            //ImGui.ShowDemoWindow();
         }
 
         protected override void OnRenderFrame(FrameEventArgs args) {
@@ -340,30 +330,30 @@ namespace Test123Bruh {
             GL.Uniform1(11, reflectionRoughness);
             GL.Uniform3(12, lightDirection.Normalized());
             GL.Uniform1(13, useMipchainCacheOpt ? 1 : 0);
-            GL.Uniform1(14, usePropagatedBoundsOpt ? 1 : 0);
+            GL.Uniform1(14, useAABBOpt ? 1 : 0);
             GL.Uniform1(15, maxSubVoxelIter);
             GL.UniformMatrix4(16, true, ref lastFrameViewMatrix);
-            //GL.Uniform1(17, 0);
+            GL.Uniform1(17, 0);
             GL.Uniform1(18, useTemporalReproOpt ? 1 : 0);
             GL.Uniform3(19, lastPosition);
-            //GL.Uniform1(20, ambientStrength);
+            GL.Uniform1(20, ambientStrength);
             GL.Uniform1(21, normalMapStrength);
-            //GL.Uniform1(22, glossStrength);
-            //GL.Uniform1(23, specularStrength);
+            GL.Uniform1(22, roughnessStrength);
+            GL.Uniform1(23, metallicStrength);
             GL.Uniform3(24, topColor);
             GL.Uniform3(25, sideColor);
             GL.Uniform1(26, holdTemporalValues ? 1 : 0);
             GL.Uniform1(27, (float)scaleDown);
             GL.Uniform1(28, usePositionalTemporalReproOpt ? 1 : 0);
+            GL.Uniform1(30, maxShadowIter);
 
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             GL.BindImageTexture(1, writeDepth, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32f);
             GL.BindTextureUnit(2, voxel.texture);
             GL.BindTextureUnit(3, skybox.texture);
-            //GL.BindTextureUnit(4, voxel.sparseHelper);
+            GL.BindTextureUnit(4, voxel.sparseHelper);
             GL.BindTextureUnit(5, depthTex2);
             
-
             GL.DispatchCompute(x, y, 1);
             GL.BlitNamedFramebuffer(fbo, 0, 0, 0, ClientSize.X / scaleDown, ClientSize.Y / scaleDown, 0, 0, ClientSize.X, ClientSize.Y, ClearBufferMask.ColorBufferBit, BlitFramebufferFilter.Nearest);
 

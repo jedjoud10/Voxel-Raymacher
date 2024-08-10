@@ -27,16 +27,19 @@ Voxel voxel(vec3 pos) {
 	val += snoise(pos * 0.02 * vec3(1, 0.3, 1)) * 5;
 	val += (1-cellular(pos.xz * 0.03).y) * 10 - 20;
 
-	if (cellular(pos.xz * 0.1).x > 0.8 && pos.y < 90) {
-		val -= 5 + snoise(pos * 0.02) * 15;
-	}
-
 	val -= (1 - abs(snoise(pos * 0.02 * vec3(1, 2, 1)))) * 2;
 
 	val += abs(snoise(pos * 0.04 * vec3(1, 3, 1))) * 2;
 	
 	float boxu = sdBox(pos - vec3(32, 30, 64), vec3(100, 60, 2));
 	val = min(val, boxu);
+
+	float a = cellular(pos.xz * 0.1).x;
+	if (a > 0.8 && pos.y < 90) {
+		val = a * 12;
+		val -= pos.y * 0.38;
+	}
+
 	data.enabled = val <= 0;
 
 	//data.enabled = -fbmBillow(pos * 0.005, 4, 0.5, 2.0) * 150 + pos.y + 120 <= 0;

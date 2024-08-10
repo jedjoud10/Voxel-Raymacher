@@ -107,7 +107,7 @@ vec3 brdf(
 	//vec3 irradiance = texture(samplerCube(ibl_diffuse_map, ibl_diffuse_map_sampler), surface.normal).xyz;
 	vec3 ambient = texture(skybox, surface.normal).xyz * surface.visibility;
 	// + vec3(clamp(dot(reflect(camera.view, surface.normal), camera.view), 0, 1)) * 0.04
-	return brdf + ambient * 0.2;
+	return brdf + ambient * ambient_strength;
 }
 
 // https://gamedev.stackexchange.com/questions/92015/optimized-linear-to-srgb-glsl
@@ -130,30 +130,13 @@ vec3 aces(vec3 x) {
 }
 
 vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir, float shadowed) {
-	vec3 small = floor(pos * 16);
-	vec3 medium = floor(pos * 4);
-	vec3 large = floor(pos * 1);
-	vec3 larger = floor(pos * 0.25);
-
-	/*
-	vec3 smooth_normal = (-(floor(pos * 4) - (pos * 4) + 0.5) / 0.5);
-	smooth_normal = normalize(smooth_normal);
-	vec3 internal = floor(pos * 4.0) / 4.0;
-	*/
-
-	normal = normalize((-(floor(pos) - (pos) + 0.5) / 0.5));
-	vec3 rand = vec3(hash13(larger) * 0.1 + hash13(medium) * 0.2 + 0.7) * (hash33(small)-0.5)*2;
-	//normal += rand * normal_map_strength;
 	normal = normalize(normal);
-
 	vec3 albedo = vec3(0.7);
-	//albedo = normal.y > 0.5 ? top_color : side_color;
-	//albedo *= (hash13(medium) * 0.2 + 0.8) * (hash33(small) * 0.2 + 0.8);
-	
-	float roughness = 0.4;
-	float metallic = 0.0;
-	float visibility = 1;
-	
+	albedo = normal.y > 0.5 ? pow(top_color, vec3(2.2)) : pow(side_color, vec3(2.2));
+
+	float roughness = 0.4 * roughness_strength;
+	float metallic = 0.2 * metallic_strength;
+	float visibility = 1;	
 
 	// Create the data structs
 	vec3 f0 = mix(vec3(0.04), albedo, metallic);
@@ -162,7 +145,6 @@ vec3 lighting(vec3 pos, vec3 normal, vec3 ray_dir, float shadowed) {
 	vec3 view = normalize(position - pos);
 	CameraData camera = CameraData(view, normalize(view + light_dir), position);
 	vec3 color = brdf(surface, camera, sun, shadowed);
-
 
 	return aces(color);
 }

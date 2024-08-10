@@ -2,39 +2,50 @@
 #version 460
 #extension GL_ARB_gpu_shader_int64 : enable
 layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+// world
+layout(binding = 2) uniform usampler3D voxels;
+layout(binding = 3) uniform samplerCube skybox;
+layout(r32i, binding = 4) uniform iimage3D sparse_helper;
+layout(location = 12) uniform vec3 light_dir;
+
+// settings
+layout(location = 27) uniform float scale_factor;
 layout(location = 1) uniform vec2 resolution;
-layout(location = 2) uniform mat4 view_matrix;
-layout(location = 3) uniform mat4 proj_matrix;
-layout(location = 4) uniform vec3 position;
 layout(location = 5) uniform int max_mip_iter;
 layout(location = 6) uniform int max_iters;
+layout(location = 30) uniform int max_shadow_iters;
 layout(location = 7) uniform int map_size;
 layout(location = 8) uniform int debug_view;
 layout(location = 9) uniform int max_reflections;
 layout(location = 10) uniform int use_sub_voxels;
 layout(location = 11) uniform float reflection_roughness;
-layout(location = 12) uniform vec3 light_dir;
 layout(location = 13) uniform int use_octree_ray_caching;
 layout(location = 14) uniform int use_prop_aabb_bounds;
 layout(location = 15) uniform int max_sub_voxel_iter;
-
-layout(rgba8, binding = 0) uniform image2D image;
-layout(binding = 2) uniform usampler3D voxels;
-layout(binding = 3) uniform samplerCube skybox;
-layout(location = 16) uniform mat4 last_frame_view_matrix;
-layout(location = 17) uniform int frame_count;
 layout(location = 18) uniform int use_temporal_depth;
+layout(location = 26) uniform int hold_temporal_values;
+layout(location = 28) uniform int use_positional_repro;
+
+
+// camera
+layout(location = 2) uniform mat4 view_matrix;
+layout(location = 3) uniform mat4 proj_matrix;
+layout(location = 4) uniform vec3 position;
+layout(location = 16) uniform mat4 last_frame_view_matrix;
 layout(location = 19) uniform vec3 last_position;
+
+// rendering
+layout(rgba8, binding = 0) uniform image2D image;
+layout(r32f, binding = 1) uniform image2D new_temporal_depth;
+layout(binding = 5) uniform sampler2D last_temporal_depth;
+layout(location = 17) uniform int frame_count;
 layout(location = 20) uniform float ambient_strength;
+layout(location = 22) uniform float roughness_strength;
+layout(location = 23) uniform float metallic_strength;
 layout(location = 21) uniform float normal_map_strength;
 layout(location = 24) uniform vec3 top_color;
 layout(location = 25) uniform vec3 side_color;
-layout(r32i, binding = 4) uniform iimage3D sparse_helper;
-layout(location = 26) uniform int hold_temporal_values;
-layout(r32f, binding = 1) uniform image2D new_temporal_depth;
-layout(binding = 5) uniform sampler2D last_temporal_depth;
-layout(location = 27) uniform float scale_factor;
-layout(location = 28) uniform int use_positional_repro;
 
 
 #include Hashes.glsl
@@ -70,7 +81,6 @@ void main() {
 
 	vec2 test_test_dists = intersection(position, ray_dir, inv_dir, vec3(0), vec3(map_size));
 	float step_size = test_test_dists.y / float(total_steps);
-	//step_size += 0.5;
 	float step_size_offset_factor = 1.0;
 	float total_repro_steps_percent_taken = 1.0;
 
@@ -87,7 +97,6 @@ void main() {
 			if (test_uvs2.x > 0 && test_uvs2.y > 0 && test_uvs2.x < 1 && test_uvs2.y < 1 && test_uvs.w > 0) {
 				float od = texture(last_temporal_depth, test_uvs2 / scale_factor).x;
 				float nd = distance(last_position, repr_pos);
-				//float od = 10000.0;
 				if (od < nd) {
 					float act_act_min_depth = distance(position, repr_pos);
 					act_act_min_depth -= step_size * step_size_offset_factor;
@@ -96,31 +105,11 @@ void main() {
 					total_repro_steps_percent_taken = float(i) / float(total_steps);
 					break;
 				}
-
-				
-				/*
-				if (od == 10000.0 && i == 0) {
-					pos_reprojected_depth = 10000000;
-					total_repro_steps_percent_taken = float(i) / float(total_steps);
-					break;
-				}
-				*/
 			}
 
 			repr_pos += ray_dir * step_size;
 		}
 	}
-	
-	//imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(bruhtu, 1.0));
-	//return;
-	
-	// reproject the uvs using the last frame's view matrix
-	/*
-	vec4 last_uvs_full = last_frame_view_matrix * vec4(ray_dir_non_normalized.xyz, 0.0);
-	last_uvs_full.w = 0.0;
-	last_uvs_full = (proj_matrix * last_uvs_full);
-	last_uvs_full.xy /= last_uvs_full.w;
-	*/
 
 	vec4 last_uvs_full = (proj_matrix * last_frame_view_matrix) * vec4(ray_dir_non_normalized.xyz, 0.0);
 	last_uvs_full.xyz /= last_uvs_full.w;
@@ -148,8 +137,6 @@ void main() {
 	float factor = 1.0;
 	
 	float min_depth = 100000;
-	//min_depth = texture(last_temporal_depth, last_uvs / scale_factor).x;
-
 	if (use_temporal_depth == 1) {
 		if (use_positional_repro == 1) {
 			min_depth = max(pos_reprojected_depth, 0);
@@ -214,12 +201,7 @@ void main() {
 
 				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
-						//ray_dir = refract(ray_dir, normal, 1.4);
 						ray_dir = reflect(ray_dir, normal);
-						//ray_dir += (hash33(floor(pos*4) / 4) - 0.5) * reflection_roughness;
-						//ray_dir += (hash32(coords * 31.5143 * vec2(12.3241, 2.341)) - 0.5) * reflection_roughness;
-						//ray_dir += vec3(snoise(pos * 0.4 + vec3(pos * 0.2) * 0.8) * reflection_roughness);
-						//ray_dir += vec3(fbm(pos * 0.4, 3, 0.5, 1.3) * reflection_roughness);
 						ray_dir = normalize(ray_dir);
 						inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 						level_cache = uint(~0);
@@ -235,40 +217,39 @@ void main() {
 					}
 				}
 
-				// lod kinda?
-				float lod = 1.0 / distance(pos, position);
-				lod = clamp(lod, 0, 1);
-				lod = 0;
-
 				float shadowed = 0;
-				vec3 shadow_pos = pos + light_dir * 0.1;
-				vec3 shadow_dir = light_dir;
-				vec3 inv_shadow_dir = 1 / (shadow_dir + vec3(0.001));
-				float sum = 0;
-				for (int i = 0; i < 32; i++) {
-					bool temp_hit = true;
-					total_iterations += 1;
-					float voxel_distance = 0.0;
+				if (max_shadow_iters > 0) {
+					vec3 shadow_pos = pos + light_dir * 0.1;
+					vec3 shadow_dir = light_dir;
+					vec3 inv_shadow_dir = 1 / (shadow_dir + vec3(0.001));
+					float sum = 0;
+					float aaaaa = 0;
+					float aaaaaa = 0;
+					float aaaaaaa = 0;
+					for (int i = 0; i < max_shadow_iters; i++) {
+						bool temp_hit = true;
+						float voxel_distance = 0.0;
 
-					// we know the map isn't *that* big
-					if (any(greaterThan(shadow_pos, vec3(map_size))) || any(lessThan(shadow_pos, vec3(0)))) {
-						break;
-					}
+						// we know the map isn't *that* big
+						if (any(greaterThan(shadow_pos, vec3(map_size))) || any(lessThan(shadow_pos, vec3(0)))) {
+							break;
+						}
 
-					// recursively go through the mip chain
-					recurse(shadow_pos, shadow_dir, inv_shadow_dir, temp_hit, voxel_distance, min_level_reached, total_mip_map_iterations, level_cache);
-					
-					// gotta add a small offset since we'd be on the very face of the voxel
-					shadow_pos += shadow_dir * max(0.001, voxel_distance);
-					sum += voxel_distance;
+						// recursively go through the mip chain
+						recurse(shadow_pos, shadow_dir, inv_shadow_dir, temp_hit, voxel_distance, aaaaaaa, aaaaaa, level_cache);
+						
+						// gotta add a small offset since we'd be on the very face of the voxel
+						shadow_pos += shadow_dir * max(0.001, voxel_distance);
+						sum += voxel_distance;
 
-					if (temp_hit && use_sub_voxels == 1) {
-						trace_internal(shadow_pos, shadow_dir, inv_shadow_dir, voxel_distance, temp_hit, total_inner_bit_fetches);
-					}
+						if (temp_hit && use_sub_voxels == 1) {
+							trace_internal(shadow_pos, shadow_dir, inv_shadow_dir, voxel_distance, temp_hit, aaaaa);
+						}
 
-					if (temp_hit) {
-						shadowed = 1;
-						break;
+						if (temp_hit) {
+							shadowed = 1;
+							break;
+						}
 					}
 				}
 				
@@ -296,7 +277,6 @@ void main() {
 		}
 		color /= pow(2, max(reflections_iters-1, 0));
 		color = aces(color);
-		//color *= pow((1 - factor), 0.5) * 0.4 + 0.6;
 	}
 	else if (debug_view == 1) {
 		int min_dir = 0;
@@ -348,10 +328,8 @@ void main() {
 	if (!hit && reflections_iters == 0) {
 		depth = 10000;
 	}
-	//return;
-	// store the value in the image that we will blit
-	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 
+	imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(color, 1.0));
 	if (hold_temporal_values == 0) {
 		imageStore(new_temporal_depth, ivec2(gl_GlobalInvocationID.xy), vec4(depth, 0, 0, 1.0));
 	}
