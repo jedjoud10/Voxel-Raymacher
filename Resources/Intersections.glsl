@@ -74,7 +74,7 @@ vec3 get_internal_box_normal(int side, vec3 ray_dir) {
 }
 
 // recrusviely go through the mip chain
-void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout float total_mip_map_iterations, inout uint level_cache) {
+void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float voxel_distance, inout float min_level_reached, inout float total_mip_map_iterations, inout uint level_cache, out int max_side_hit) {
 	//return;
 	// recursively iterate through the mip maps (starting at the highest level)
 	// TODO: don't start iterating at the highest level if we know what direction the ray is going and what the current child history is
@@ -98,12 +98,13 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 
 		// use the mip maps themselves as an acceleration structure
 		float scale_factor = pow(2, j);
+		int raara = 0;
 		vec3 grid_level_point = floor(pos / scale_factor) * scale_factor;
 		vec3 bounds_min = grid_level_point;
 		vec3 bounds_max = bounds_min + vec3(scale_factor);
 
 		// calculate temporary distance to the end of the current cell for the current mipmap
-		vec2 distances = intersection(pos, ray_dir, inv_dir, bounds_min, bounds_max);
+		vec2 distances = intersection(pos, ray_dir, inv_dir, bounds_min, bounds_max, raara, max_side_hit);
 		float inside_node_closest_dist = distances.y;
 
 		// instead of using the bounds directly, use the propagated aabb for tighter culling

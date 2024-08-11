@@ -171,10 +171,12 @@ void main() {
 		}
 
 		// recursively go through the mip chain
-		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, total_mip_map_iterations, level_cache);
+		int max_side_hit_g = 0;
+		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, total_mip_map_iterations, level_cache, max_side_hit_g);
 
 		// gotta add a small offset since we'd be on the very face of the voxel
-		pos += ray_dir * max(0.001, voxel_distance);
+		vec3 testa = pos;
+		pos += ray_dir * max(0.01, voxel_distance);
 
 		// do all of our lighting calculations here
 		if (temp_hit) {
@@ -188,15 +190,15 @@ void main() {
 				// Find normal using another intersection test
 				int min_side_hit = 0;
 				int max_side_hit = 0;
-				pos += ray_dir * 0.001;
+				//pos += ray_dir * 0.01;
 				float scale = (use_sub_voxels == 1) ? 0.25 : 1;
 
 				if (reflections_iters == 0) {
 					first_touched_pos = pos;
 				}
 
-				vec3 grid_level_point = floor(pos / scale) * scale;
-				vec2 dists = intersection(pos, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
+				vec3 grid_level_point = floor(testa / scale) * scale;
+				vec2 dists = intersection(testa + ray_dir, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
 				normal = get_internal_box_normal(max_side_hit, ray_dir);
 
 				if (pos.x < 33) {
@@ -236,7 +238,8 @@ void main() {
 						}
 
 						// recursively go through the mip chain
-						recurse(shadow_pos, shadow_dir, inv_shadow_dir, temp_hit, voxel_distance, aaaaaaa, aaaaaa, level_cache);
+						int max_side_hit_g = 0;
+						recurse(shadow_pos, shadow_dir, inv_shadow_dir, temp_hit, voxel_distance, aaaaaaa, aaaaaa, level_cache, max_side_hit_g);
 						
 						// gotta add a small offset since we'd be on the very face of the voxel
 						shadow_pos += shadow_dir * max(0.001, voxel_distance);
@@ -254,12 +257,15 @@ void main() {
 				}
 				
 				color = lighting(pos, normal, ray_dir, shadowed);
-				
+				//color = vec3(dists.y - dists.x);
+
 				// dim the block faces if they are facing inside
+				/*
 				vec3 ta = (pos - ray_dir * 0.02);
 				if (all(greaterThan(ta, grid_level_point)) && all(lessThan(ta, grid_level_point + vec3(scale)))) {
 					//color *= 0.3;
 				}
+				*/
 
 				hit = true;
 				break;

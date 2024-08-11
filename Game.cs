@@ -28,14 +28,14 @@ namespace Test123Bruh {
 
         int maxLevelIter = 0;
         int maxIter = 64;
-        int maxShadowIter = 32;
-        int maxReflections = 1;
+        int maxShadowIter = 0;
+        int maxReflections = 3;
         int maxSubVoxelIter = 6;
         float reflectionRoughness = 0.02f;
         int debugView = 0;
         bool useSubVoxels = false;
         bool useMipchainCacheOpt = false;
-        bool useAABBOpt = false;
+        bool useAABBOpt = true;
         bool useTemporalReproOpt = false;
         bool usePositionalTemporalReproOpt = false;
         ulong frameCount = 0;
