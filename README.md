@@ -17,6 +17,9 @@ I made a video about this and the main optimizations that I implemented. I wrote
 
 Video: https://youtu.be/Wzo-LqPfMPE
 
+** WARNING **
+I do have to warn you though, since the whole system is using an iterative approach for reflections, in some cases the GPU driver could crash due to long "wait" times. I never had these happen on *my* GPU but just be careful.
+I really gotta optimize this lel.
 
 [Depth Reprojection Optimization Blog](https://jedjoud10.github.io/blog/depth-reproj/)
 
