@@ -26,6 +26,7 @@ layout(location = 15) uniform int max_sub_voxel_iter;
 layout(location = 18) uniform int use_temporal_depth;
 layout(location = 26) uniform int hold_temporal_values;
 layout(location = 28) uniform int use_positional_repro;
+layout(location = 40) uniform int max_repro_iter;
 
 
 // camera
@@ -77,7 +78,7 @@ void main() {
 	vec3 repr_pos = position + ray_dir;
 	vec3 bruhtu = vec3(0.0);
 	float pos_reprojected_depth = 0.0;
-	int total_steps = 32;
+	int total_steps = max_repro_iter;
 
 	vec2 test_test_dists = intersection(position, ray_dir, inv_dir, vec3(0), vec3(map_size));
 	float step_size = test_test_dists.y / float(total_steps);
@@ -175,8 +176,8 @@ void main() {
 		recurse(pos, ray_dir, inv_dir, temp_hit, voxel_distance, min_level_reached, total_mip_map_iterations, level_cache, max_side_hit_g);
 
 		// gotta add a small offset since we'd be on the very face of the voxel
-		vec3 testa = pos;
-		pos += ray_dir * max(0.01, voxel_distance);
+		//vec3 testa = pos;
+		pos += ray_dir * max(0.001, voxel_distance);
 
 		// do all of our lighting calculations here
 		if (temp_hit) {
@@ -190,20 +191,20 @@ void main() {
 				// Find normal using another intersection test
 				int min_side_hit = 0;
 				int max_side_hit = 0;
-				//pos += ray_dir * 0.01;
+				pos += ray_dir * 0.001;
 				float scale = (use_sub_voxels == 1) ? 0.25 : 1;
 
 				if (reflections_iters == 0) {
 					first_touched_pos = pos;
 				}
 
-				vec3 grid_level_point = floor(testa / scale) * scale;
-				vec2 dists = intersection(testa + ray_dir, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
+				vec3 grid_level_point = floor(pos / scale) * scale;
+				vec2 dists = intersection(pos + ray_dir, -ray_dir, -inv_dir, grid_level_point, grid_level_point + vec3(scale), min_side_hit, max_side_hit);
 				normal = get_internal_box_normal(max_side_hit, ray_dir);
 
 				if (pos.x < 33) {
 					if (reflections_iters < max_reflections) {
-						ray_dir = reflect(ray_dir, normal);
+						ray_dir = reflect(ray_dir, normal + (hash33(pos * vec3(542.1, 4323.321, 65.34)) - 0.5) * reflection_roughness);
 						ray_dir = normalize(ray_dir);
 						inv_dir = 1.0 / (ray_dir + vec3(0.0001));
 						level_cache = uint(~0);

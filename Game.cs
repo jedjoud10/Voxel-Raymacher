@@ -31,6 +31,7 @@ namespace Test123Bruh {
         int maxShadowIter = 0;
         int maxReflections = 3;
         int maxSubVoxelIter = 6;
+        int maxReproIter = 32;
         float reflectionRoughness = 0.02f;
         int debugView = 0;
         bool useSubVoxels = false;
@@ -204,6 +205,7 @@ namespace Test123Bruh {
                 if (!useTemporalReproOpt)
                     ImGui.BeginDisabled();
                 ImGui.Checkbox("Use Positional Reprojection ?", ref usePositionalTemporalReproOpt);
+                ImGui.SliderInt("Max Positional Repro Iters", ref maxReproIter, 16, 128);
                 if (!useTemporalReproOpt)
                     ImGui.EndDisabled();
                 ImGui.Checkbox("Hold Temporal Values?", ref holdTemporalValues);
@@ -254,7 +256,7 @@ namespace Test123Bruh {
             float delta = (float)args.Time;
             frameGraphData[frameCount % 512] = delta;
 
-            lightDirection = new Vector3(MathF.Sin(timeElapsed), 0.8f, MathF.Cos(timeElapsed)).Normalized();
+            lightDirection = new Vector3(MathF.Sin(timeElapsed * 0.01f), 0.6f, MathF.Cos(timeElapsed * 0.01f)).Normalized();
 
 
             skybox.Update(timeElapsed, lightDirection);
@@ -279,14 +281,6 @@ namespace Test123Bruh {
             if (KeyboardState.IsKeyPressed(Keys.F4)) {
                 CursorState = 2 - CursorState;
             }
-
-            /*
-            if (KeyboardState.IsKeyDown(Keys.F2)) {
-                debugView = 11;
-            } else {
-                debugView = 10;
-            }
-            */
                 
             if (KeyboardState.IsKeyPressed(Keys.F1)) {
                 holdTemporalValues = !holdTemporalValues;
@@ -346,6 +340,7 @@ namespace Test123Bruh {
             GL.Uniform1(27, (float)scaleDown);
             GL.Uniform1(28, usePositionalTemporalReproOpt ? 1 : 0);
             GL.Uniform1(30, maxShadowIter);
+            GL.Uniform1(40, maxReproIter);
 
             GL.BindImageTexture(0, screenTexture, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.Rgba8);
             GL.BindImageTexture(1, writeDepth, 0, false, 0, TextureAccess.WriteOnly, SizedInternalFormat.R32f);

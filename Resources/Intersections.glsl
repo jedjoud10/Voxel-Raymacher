@@ -1,19 +1,4 @@
-﻿
-/*
-for (int d = 0; d < 3; d++) {
-	bool sign = sign(inv_dir[d]) == 1.0;
-	float bmin = vertices[int(sign)][d];
-	float bmax = vertices[int(!sign)][d];
-
-	float dmin = (bmin - position[d]) * inv_dir[d];
-	float dmax = (bmax - position[d]) * inv_dir[d];
-
-	tmin = max(dmin, tmin);
-	tmax = min(dmax, tmax);
-}
-*/
-
-// 3d cube vs ray intersection that allows us to calculate closest distance to face of cube
+﻿// 3d cube vs ray intersection that allows us to calculate closest distance to face of cube
 // https://tavianator.com/2022/ray_box_boundary.html :3
 vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig, inout int max_dir, inout int min_dir) {
 	float tmin = 0.0, tmax = 1000000.0;
@@ -48,7 +33,6 @@ vec2 intersection(vec3 pos, vec3 dir, vec3 inv_dir, vec3 smol, vec3 beig) {
 uint64_t get_binary_data(vec3 pos) {
 	ivec3 tex_point = ivec3(floor(pos));
 	return packUint2x32(texelFetch(voxels, tex_point, 0).xy);
-	//return packUint2x32(imageLoad(voxels[0], tex_point).xy);
 }
 
 // check if the sub-voxel at one position is set to true
@@ -109,20 +93,6 @@ void recurse(vec3 pos, vec3 ray_dir, vec3 inv_dir, inout bool hit, inout float v
 
 		// instead of using the bounds directly, use the propagated aabb for tighter culling
 		ivec3 tex_point = ivec3(floor(pos / scale_factor));
-
-		// I LOVE SPARSE TEXTURES!!!!
-		int page_size = 16;
-
-		// pos means full
-		// neg means empty
-		/*
-		int sparse_code = imageLoad(sparse_helper, tex_point / page_size).x;
-		if (sparse_code == 4096) {
-			voxel_distance = inside_node_closest_dist;
-			hit = false;
-			return;
-		}
-		*/
 		bool quit = false;
 		uvec2 data = texelFetch(voxels, tex_point, j).xy;
 		float closest_tahini = inside_node_closest_dist;
@@ -193,7 +163,6 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxe
 	vec3 min_pos = floor(pos);
 	vec3 max_pos = ceil(pos);
 
-	//vec3 intputu = floor(pos * 4) - floor(pos) * 4;
 	for (int i = 0; i < max_sub_voxel_iter; i++) {
 		vec3 grid_level_point = floor(pos / 0.25) * 0.25;
 		bit_fetches += 1.0;
@@ -212,14 +181,6 @@ void trace_internal(inout vec3 pos, vec3 ray_dir, vec3 inv_dir, inout float voxe
 			break;
 		}
 	}
-
-	/*
-	vec3 outputu = floor(pos * 4) - floor(pos) * 4;
-
-	if (outputu.x == intputu.x && outputu.y == intputu.y) {
-		bit_fetches += 1.0;
-	}
-	*/
 
 	hit = false;
 }

@@ -35,14 +35,12 @@ Voxel voxel(vec3 pos) {
 	val = min(val, boxu);
 
 	float a = cellular(pos.xz * 0.1).x;
-	if (a > 0.8 && pos.y < 90) {
+	if (a > 0.8 && pos.y < (80 + round(snoise(pos.xz * 0.01) * 3) * 10)) {
 		val = a * 12;
 		val -= pos.y * 0.38;
 	}
 
 	data.enabled = val <= 0;
-
-	//data.enabled = -fbmBillow(pos * 0.005, 4, 0.5, 2.0) * 150 + pos.y + 120 <= 0;
 	return data;
 }
 
