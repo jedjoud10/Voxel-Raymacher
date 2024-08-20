@@ -15,20 +15,20 @@ Main Controls:
 I made a video about this and the main optimizations that I implemented. I wrote these just based on knowing what could slow down the GPU, as I wasn't able to properly profile 
 (I'm using opengl and not vulkan)
 
-Video: https://youtu.be/Wzo-LqPfMPE
+### Uhhhh
+* Video: https://youtu.be/Wzo-LqPfMPE
+* [Depth Reprojection Optimization Blog](https://jedjoud10.github.io/blog/depth-reproj/)
 
-** WARNING **
+## WARNING
 I do have to warn you though, since the whole system is using an iterative approach for reflections, in some cases the GPU driver could crash due to long "wait" times. I never had these happen on *my* GPU but just be careful.
 I really gotta optimize this lel.
 
-[Depth Reprojection Optimization Blog](https://jedjoud10.github.io/blog/depth-reproj/)
-
-Requirements to run:
+## Requirements
 * OpenGL 4.6, with support for GL_ARB_gpu_shader_int64
 * ~~Sparse Textures Support~~ don't even work on my 780m so I toggled them off in the code
 
 
-Credits / Tools used:
+## Credits / Tools used:
 * [imgui](https://github.com/ocornut/imgui)
 * OpenGL and GLSL
 * [OpenTK](https://github.com/opentk/opentk)
